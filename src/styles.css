@@ -89,6 +89,16 @@ body {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+#p5-canvas-container {
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+#p5-canvas-container canvas {
+  display: block;
+  border-radius: 0.5rem;
+}
+
 /* Control Panel */
 .control-panel {
   width: 400px;

@@ -1,12 +1,16 @@
 import "./styles.css";
 import { MirrorPuzzle } from "./MirrorPuzzle";
-import type { Point } from "./types";
+import { P5Renderer } from "./P5Renderer";
 
 // Initialize the puzzle
 const puzzle = new MirrorPuzzle();
+let renderer: P5Renderer | null = null;
 
 // Initialize UI elements
 function initializeUI() {
+  // Initialize the P5 renderer
+  renderer = new P5Renderer(puzzle, "p5-canvas-container");
+  
   // Mode buttons
   const editModeBtn = document.getElementById("edit-mode-btn") as HTMLButtonElement;
   const playModeBtn = document.getElementById("play-mode-btn") as HTMLButtonElement;
@@ -14,13 +18,11 @@ function initializeUI() {
   editModeBtn?.addEventListener("click", () => {
     puzzle.setMode("edit");
     updateModeUI();
-    updateCanvas();
   });
   
   playModeBtn?.addEventListener("click", () => {
     puzzle.setMode("play");
     updateModeUI();
-    updateCanvas();
   });
 
   // Export/Import buttons
@@ -62,7 +64,6 @@ function initializeUI() {
     checkbox?.addEventListener("change", () => {
       puzzle.setMirror(side as "top" | "right" | "bottom" | "left", checkbox.checked);
       updateMirrorVisualization();
-      updateCanvas();
     });
   });
 
@@ -96,7 +97,6 @@ function initializeUI() {
   const addTouchAreaBtn = document.getElementById("add-touch-area-btn") as HTMLButtonElement;
   addTouchAreaBtn?.addEventListener("click", () => {
     puzzle.addTouchArea(); // Use default position (center of canvas)
-    updateCanvas();
     updateConfigurationWarning();
   });
 
@@ -213,6 +213,9 @@ function updateConfigurationWarning() {
     warningBox.appendChild(message);
     warningsContainer.appendChild(warningBox);
   });
+  
+  // Also update the renderer's warning display if needed
+  renderer?.updateConfigurationWarning();
 }
 
 function showFeedback(result: any) {
@@ -229,330 +232,12 @@ function showFeedback(result: any) {
   
   // Store the submission result for rendering
   puzzle.storeSubmissionResult(result);
-  updateCanvas();
-}
-
-function updateCanvas() {
-  const canvas = document.getElementById("canvas") as unknown as SVGElement;
-  if (!canvas) return;
-
-  // Clear existing content (except for persistent groups)
-  const roomGroup = document.getElementById("room-group") || createGroup(canvas, "room-group");
-  const objectsGroup = document.getElementById("objects-group") || createGroup(canvas, "objects-group");
-  const virtualObjectsGroup = document.getElementById("virtual-objects") || canvas.querySelector("#virtual-objects");
-  const virtualRoomsGroup = document.getElementById("virtual-rooms") || canvas.querySelector("#virtual-rooms");
-  const touchAreasGroup = document.getElementById("touch-areas-group") || createGroup(canvas, "touch-areas-group");
-  const rayPathsGroup = document.getElementById("ray-paths-group") || createGroup(canvas, "ray-paths-group");
-
-  // Clear content
-  roomGroup.innerHTML = "";
-  objectsGroup.innerHTML = "";
-  if (virtualObjectsGroup) virtualObjectsGroup.innerHTML = "";
-  if (virtualRoomsGroup) virtualRoomsGroup.innerHTML = "";
-  touchAreasGroup.innerHTML = "";
-  rayPathsGroup.innerHTML = "";
-
-  // Room is 200x200, centered in 800x800 canvas
-  const roomSize = 200;
-  const canvasSize = 800;
-  const offset = (canvasSize - roomSize) / 2; // 300px offset to center the room
-  
-  // Helper to convert room coordinates to canvas coordinates
-  const roomToCanvas = (x: number, y: number) => {
-    return {
-      x: x + offset,
-      y: y + offset
-    };
-  };
-
-  // Draw background
-  const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  bg.setAttribute("x", "0");
-  bg.setAttribute("y", "0");
-  bg.setAttribute("width", "800");
-  bg.setAttribute("height", "800");
-  bg.setAttribute("fill", "#e0e0e0");
-  roomGroup.appendChild(bg);
-
-  // Draw main room (200x200 centered)
-  const roomRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  roomRect.setAttribute("x", String(offset));
-  roomRect.setAttribute("y", String(offset));
-  roomRect.setAttribute("width", String(roomSize));
-  roomRect.setAttribute("height", String(roomSize));
-  roomRect.setAttribute("fill", "#ffffff");
-  roomRect.setAttribute("stroke", "#333");
-  roomRect.setAttribute("stroke-width", "2");
-  roomGroup.appendChild(roomRect);
-
-  // Draw mirrors on room edges
-  const mirrors = puzzle.getMirrors();
-  const mirrorStyle = "stroke: #4a90e2; stroke-width: 3; stroke-linecap: round;";
-  
-  if (mirrors.top) {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", String(offset));
-    line.setAttribute("y1", String(offset));
-    line.setAttribute("x2", String(offset + roomSize));
-    line.setAttribute("y2", String(offset));
-    line.setAttribute("style", mirrorStyle);
-    roomGroup.appendChild(line);
-  }
-  
-  if (mirrors.right) {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", String(offset + roomSize));
-    line.setAttribute("y1", String(offset));
-    line.setAttribute("x2", String(offset + roomSize));
-    line.setAttribute("y2", String(offset + roomSize));
-    line.setAttribute("style", mirrorStyle);
-    roomGroup.appendChild(line);
-  }
-  
-  if (mirrors.bottom) {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", String(offset));
-    line.setAttribute("y1", String(offset + roomSize));
-    line.setAttribute("x2", String(offset + roomSize));
-    line.setAttribute("y2", String(offset + roomSize));
-    line.setAttribute("style", mirrorStyle);
-    roomGroup.appendChild(line);
-  }
-  
-  if (mirrors.left) {
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", String(offset));
-    line.setAttribute("y1", String(offset));
-    line.setAttribute("x2", String(offset));
-    line.setAttribute("y2", String(offset + roomSize));
-    line.setAttribute("style", mirrorStyle);
-    roomGroup.appendChild(line);
-  }
-
-  // Get object positions
-  const objects = puzzle.getObjects();
-  
-  // Draw triangle object (positions are in room coordinates 0-200)
-  const trianglePos = roomToCanvas(objects.triangle.x, objects.triangle.y);
-  const triangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-  const size = 10;
-  const points = `${trianglePos.x},${trianglePos.y - size} ${trianglePos.x - size},${trianglePos.y + size} ${trianglePos.x + size},${trianglePos.y + size}`;
-  triangle.setAttribute("points", points);
-  triangle.setAttribute("fill", "#ff6b6b");
-  triangle.setAttribute("stroke", "#d63031");
-  triangle.setAttribute("stroke-width", "2");
-  triangle.setAttribute("class", "draggable-object");
-  triangle.setAttribute("data-object", "triangle");
-  triangle.setAttribute("cursor", puzzle.getMode() === "edit" ? "move" : "default");
-  objectsGroup.appendChild(triangle);
-
-  // Draw viewer (eye symbol)
-  const viewerPos = roomToCanvas(objects.viewer.x, objects.viewer.y);
-  
-  // Eye outline (circle)
-  const eyeOutline = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
-  eyeOutline.setAttribute("cx", String(viewerPos.x));
-  eyeOutline.setAttribute("cy", String(viewerPos.y));
-  eyeOutline.setAttribute("rx", "12");
-  eyeOutline.setAttribute("ry", "8");
-  eyeOutline.setAttribute("fill", "#333");
-  eyeOutline.setAttribute("stroke", "#000");
-  eyeOutline.setAttribute("stroke-width", "2");
-  eyeOutline.setAttribute("class", "draggable-object");
-  eyeOutline.setAttribute("data-object", "viewer");
-  eyeOutline.setAttribute("cursor", puzzle.getMode() === "edit" ? "move" : "default");
-  objectsGroup.appendChild(eyeOutline);
-  
-  // Eye pupil
-  const pupil = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  pupil.setAttribute("cx", String(viewerPos.x));
-  pupil.setAttribute("cy", String(viewerPos.y));
-  pupil.setAttribute("r", "4");
-  pupil.setAttribute("fill", "#fff");
-  pupil.setAttribute("pointer-events", "none");
-  objectsGroup.appendChild(pupil);
-
-  // Draw virtual rooms (reflected room boundaries)
-  const virtualData = puzzle.getVirtualObjects();
-  virtualData.virtualRooms.forEach((vRoom) => {
-    if (vRoom.depth > 0) {
-      const vRoomPos = roomToCanvas(vRoom.position.x, vRoom.position.y);
-      const vRoomRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      vRoomRect.setAttribute("x", String(vRoomPos.x));
-      vRoomRect.setAttribute("y", String(vRoomPos.y));
-      vRoomRect.setAttribute("width", String(roomSize));
-      vRoomRect.setAttribute("height", String(roomSize));
-      vRoomRect.setAttribute("fill", "none");
-      vRoomRect.setAttribute("stroke", "#999");
-      vRoomRect.setAttribute("stroke-width", "1");
-      vRoomRect.setAttribute("stroke-dasharray", "3,3");
-      vRoomRect.setAttribute("opacity", String(vRoom.opacity));
-      if (virtualRoomsGroup) virtualRoomsGroup.appendChild(vRoomRect);
-    }
-  });
-
-  // Draw virtual objects (reflections)
-  virtualData.virtualObjects.forEach((vObj) => {
-    const vPos = roomToCanvas(vObj.position.x, vObj.position.y);
-    
-    if (vObj.sourceType === "triangle") {
-      const vTriangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-      const vPoints = `${vPos.x},${vPos.y - size} ${vPos.x - size},${vPos.y + size} ${vPos.x + size},${vPos.y + size}`;
-      vTriangle.setAttribute("points", vPoints);
-      vTriangle.setAttribute("fill", "#ff6b6b");
-      vTriangle.setAttribute("stroke", "#d63031");
-      vTriangle.setAttribute("stroke-width", "1");
-      vTriangle.setAttribute("opacity", String(vObj.opacity));
-      vTriangle.setAttribute("stroke-dasharray", "2,2");
-      if (virtualObjectsGroup) virtualObjectsGroup.appendChild(vTriangle);
-    }
-  });
-
-  // Draw touch areas
-  const touchAreas = puzzle.getAllTouchAreas();
-  const selectedAreas = puzzle.getSelectedTouchAreas();
-  const mode = puzzle.getMode();
-  const submissionResult = puzzle.getSubmissionResult();
-  
-  touchAreas.forEach((area) => {
-    // Touch areas can be anywhere on canvas, not restricted to room
-    const areaX = area.position.x;
-    const areaY = area.position.y;
-    const size = 60; // Size of the square touch area
-    
-    // Check if we have submission feedback to show
-    const hasSubmissionFeedback = mode === "play" && submissionResult;
-    
-    // Determine the visual state based on submission result
-    let fillColor, strokeColor, strokeWidth, opacity = "1";
-    let showIndicator = false;
-    let indicatorColor = "";
-    let indicatorSymbol = "";
-    
-    if (mode === "edit") {
-      // Edit mode: show correct/incorrect status with lighter fill
-      fillColor = area.isCorrect ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)";
-      strokeColor = area.isCorrect ? "#4caf50" : "#f44336";
-      strokeWidth = "2";
-      showIndicator = true;
-      indicatorColor = area.isCorrect ? "#4caf50" : "#f44336";
-      indicatorSymbol = area.isCorrect ? "✓" : "✗";
-    } else if (hasSubmissionFeedback) {
-      // Play mode with submission feedback
-      const isSelected = selectedAreas.includes(area.id);
-      
-      if (!isSelected) {
-        // Unselected areas become invisible
-        opacity = "0";
-        fillColor = "transparent";
-        strokeColor = "transparent";
-        strokeWidth = "0";
-      } else if (submissionResult.isCorrect) {
-        // User got everything correct - all selected areas are green
-        fillColor = "rgba(76, 175, 80, 0.3)";
-        strokeColor = "#4caf50";
-        strokeWidth = "3";
-        showIndicator = true;
-        indicatorColor = "#4caf50";
-        indicatorSymbol = "✓";
-      } else {
-        // User made mistakes - check each area
-        if (submissionResult.selectedCorrect.includes(area.id)) {
-          // Correctly selected area but answer is wrong overall - grey
-          fillColor = "rgba(158, 158, 158, 0.3)";
-          strokeColor = "#757575";
-          strokeWidth = "3";
-          showIndicator = true;
-          indicatorColor = "#757575";
-          indicatorSymbol = "✓";
-        } else if (submissionResult.selectedIncorrect.includes(area.id)) {
-          // Incorrectly selected area - yellow/orange
-          fillColor = "rgba(255, 193, 7, 0.3)";
-          strokeColor = "#ff9800";
-          strokeWidth = "3";
-          showIndicator = true;
-          indicatorColor = "#ff9800";
-          indicatorSymbol = "✗";
-        } else {
-          // This shouldn't happen for selected areas
-          opacity = "0";
-          fillColor = "transparent";
-          strokeColor = "transparent";
-          strokeWidth = "0";
-        }
-      }
-    } else {
-      // Play mode without submission - normal selection state
-      const isSelected = selectedAreas.includes(area.id);
-      fillColor = isSelected ? "rgba(33, 150, 243, 0.3)" : "rgba(158, 158, 158, 0.05)";
-      strokeColor = isSelected ? "#2196f3" : "#999999";
-      strokeWidth = isSelected ? "3" : "2";
-    }
-    
-    // Create rounded rectangle
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", String(areaX - size/2));
-    rect.setAttribute("y", String(areaY - size/2));
-    rect.setAttribute("width", String(size));
-    rect.setAttribute("height", String(size));
-    rect.setAttribute("rx", "8"); // Rounded corners
-    rect.setAttribute("ry", "8");
-    rect.setAttribute("opacity", opacity);
-    
-    if (mode === "edit") {
-      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: move; opacity: ${opacity}`);
-      rect.setAttribute("title", "Click to toggle correct/incorrect, Drag to move, Right-click to delete");
-    } else if (hasSubmissionFeedback) {
-      // Disable interaction after submission
-      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: default; opacity: ${opacity}; pointer-events: none;`);
-    } else {
-      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: pointer; opacity: ${opacity}`);
-    }
-    
-    rect.setAttribute("class", "touch-area");
-    rect.setAttribute("data-id", area.id);
-    touchAreasGroup.appendChild(rect);
-    
-    // Add checkmark or X in top-right corner when needed
-    if (showIndicator && opacity !== "0") {
-      // Background circle for the indicator
-      const indicatorBg = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      const indicatorX = areaX + size/2 - 10;
-      const indicatorY = areaY - size/2 + 10;
-      indicatorBg.setAttribute("cx", String(indicatorX));
-      indicatorBg.setAttribute("cy", String(indicatorY));
-      indicatorBg.setAttribute("r", "10");
-      indicatorBg.setAttribute("fill", indicatorColor);
-      indicatorBg.setAttribute("pointer-events", "none");
-      touchAreasGroup.appendChild(indicatorBg);
-      
-      // Checkmark or X symbol
-      const symbol = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      symbol.setAttribute("x", String(indicatorX));
-      symbol.setAttribute("y", String(indicatorY + 4));
-      symbol.setAttribute("text-anchor", "middle");
-      symbol.setAttribute("font-size", "14");
-      symbol.setAttribute("font-weight", "bold");
-      symbol.setAttribute("fill", "white");
-      symbol.setAttribute("pointer-events", "none");
-      symbol.textContent = indicatorSymbol;
-      touchAreasGroup.appendChild(symbol);
-    }
-  });
-}
-
-function createGroup(parent: SVGElement, id: string): SVGGElement {
-  const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  group.setAttribute("id", id);
-  parent.appendChild(group);
-  return group;
 }
 
 function updateUI() {
   updateModeUI();
   updateMirrorVisualization();
   updateConfigurationWarning();
-  updateCanvas();
   
   // Update content fields
   const content = puzzle.getContent();
@@ -591,227 +276,11 @@ function downloadJSON(json: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-// Drag and drop functionality
-function initializeDragAndDrop() {
-  const canvas = document.getElementById("canvas") as unknown as SVGElement;
-  if (!canvas) return;
-
-  let isDragging = false;
-  let draggedObject: "triangle" | "viewer" | null = null;
-  let draggedTouchArea: string | null = null;
-  let dragOffset = { x: 0, y: 0 };
-  let mouseDownPos = { x: 0, y: 0 };
-  let hasMoved = false;
-
-  // Constants for room and canvas dimensions
-  const roomSize = 200;
-  const canvasSize = 800;
-  const canvasOffset = (canvasSize - roomSize) / 2; // 300px
-  
-  // Object sizes (half-widths for boundary calculation)
-  const triangleHalfSize = 10;
-  const viewerHalfWidth = 12;
-  const viewerHalfHeight = 8;
-
-  // Convert canvas coordinates to room coordinates
-  function canvasToRoom(canvasX: number, canvasY: number): Point {
-    return {
-      x: canvasX - canvasOffset,
-      y: canvasY - canvasOffset
-    };
-  }
-
-  // Get mouse position relative to canvas
-  function getMousePos(e: MouseEvent): Point {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-  }
-
-  // Constrain position within room bounds with object size consideration
-  function constrainPosition(x: number, y: number, objectType: "triangle" | "viewer"): Point {
-    let minX: number, maxX: number, minY: number, maxY: number;
-    
-    if (objectType === "triangle") {
-      minX = triangleHalfSize;
-      maxX = roomSize - triangleHalfSize;
-      minY = triangleHalfSize;
-      maxY = roomSize - triangleHalfSize;
-    } else {
-      minX = viewerHalfWidth;
-      maxX = roomSize - viewerHalfWidth;
-      minY = viewerHalfHeight;
-      maxY = roomSize - viewerHalfHeight;
-    }
-    
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y))
-    };
-  }
-
-  // Mouse down handler
-  canvas.addEventListener("mousedown", (e: MouseEvent) => {
-    const target = e.target as SVGElement;
-    const mode = puzzle.getMode();
-    
-    if (mode === "edit") {
-      const objectType = target.getAttribute("data-object");
-      const touchAreaId = target.getAttribute("data-id");
-      
-      if (objectType === "triangle" || objectType === "viewer") {
-        // Start dragging object
-        isDragging = true;
-        draggedObject = objectType as "triangle" | "viewer";
-        
-        const mousePos = getMousePos(e);
-        const objects = puzzle.getObjects();
-        const objPos = draggedObject === "triangle" ? objects.triangle : objects.viewer;
-        
-        dragOffset = {
-          x: mousePos.x - (objPos.x + canvasOffset),
-          y: mousePos.y - (objPos.y + canvasOffset)
-        };
-        
-        e.preventDefault();
-      } else if (touchAreaId) {
-        // Prepare for potential drag
-        const mousePos = getMousePos(e);
-        mouseDownPos = { x: mousePos.x, y: mousePos.y };
-        hasMoved = false;
-        draggedTouchArea = touchAreaId;
-        
-        const touchAreas = puzzle.getAllTouchAreas();
-        const area = touchAreas.find(a => a.id === touchAreaId);
-        
-        if (area) {
-          dragOffset = {
-            x: mousePos.x - area.position.x,
-            y: mousePos.y - area.position.y
-          };
-        }
-        
-        e.preventDefault();
-      }
-    } else if (mode === "play") {
-      // Handle touch area selection in play mode
-      const touchAreaId = target.getAttribute("data-id");
-      if (touchAreaId) {
-        const touchAreas = puzzle.getAllTouchAreas();
-        const area = touchAreas.find(a => a.id === touchAreaId);
-        if (area) {
-          // Toggle selection
-          const selected = puzzle.getSelectedTouchAreas();
-          if (selected.includes(touchAreaId)) {
-            puzzle.deselectTouchArea(touchAreaId);
-          } else {
-            puzzle.selectTouchArea(touchAreaId);
-          }
-          updateCanvas();
-        }
-        e.preventDefault();
-      }
-    }
-  });
-
-  // Mouse move handler
-  canvas.addEventListener("mousemove", (e: MouseEvent) => {
-    const mousePos = getMousePos(e);
-    
-    // Check if we should start dragging (mouse moved more than 5 pixels)
-    if (draggedTouchArea && !isDragging) {
-      const distance = Math.sqrt(
-        Math.pow(mousePos.x - mouseDownPos.x, 2) + 
-        Math.pow(mousePos.y - mouseDownPos.y, 2)
-      );
-      if (distance > 5) {
-        isDragging = true;
-        hasMoved = true;
-      }
-    }
-    
-    if (!isDragging) return;
-    
-    if (draggedObject) {
-      const roomPos = canvasToRoom(mousePos.x - dragOffset.x, mousePos.y - dragOffset.y);
-      const constrainedPos = constrainPosition(roomPos.x, roomPos.y, draggedObject);
-      puzzle.moveObject(draggedObject, constrainedPos);
-      updateCanvas();
-    } else if (draggedTouchArea) {
-      // Touch areas can be placed anywhere on the canvas
-      const canvasPos = {
-        x: mousePos.x - dragOffset.x,
-        y: mousePos.y - dragOffset.y
-      };
-      // Constrain to canvas bounds only
-      const constrainedPos = {
-        x: Math.max(30, Math.min(canvasSize - 30, canvasPos.x)),
-        y: Math.max(30, Math.min(canvasSize - 30, canvasPos.y))
-      };
-      puzzle.moveTouchArea(draggedTouchArea, constrainedPos);
-      updateCanvas();
-    }
-    
-    e.preventDefault();
-  });
-
-  // Mouse up handler
-  canvas.addEventListener("mouseup", () => {
-    // If we have a touch area and didn't move, toggle it
-    if (draggedTouchArea && !hasMoved && puzzle.getMode() === "edit") {
-      const touchAreas = puzzle.getAllTouchAreas();
-      const area = touchAreas.find(a => a.id === draggedTouchArea);
-      if (area) {
-        puzzle.setTouchAreaCorrect(draggedTouchArea, !area.isCorrect);
-        updateCanvas();
-        updateConfigurationWarning();
-      }
-    }
-    
-    isDragging = false;
-    draggedObject = null;
-    draggedTouchArea = null;
-    hasMoved = false;
-  });
-
-  // Mouse leave handler (stop dragging if mouse leaves canvas)
-  canvas.addEventListener("mouseleave", () => {
-    isDragging = false;
-    draggedObject = null;
-    draggedTouchArea = null;
-    hasMoved = false;
-  });
-  
-  // Remove the automatic touch area creation on canvas click
-  // Touch areas should only be created via the Add Touch Area button
-  
-  // Right-click handler for deleting touch areas
-  canvas.addEventListener("contextmenu", (e: MouseEvent) => {
-    if (puzzle.getMode() !== "edit") return;
-    
-    const target = e.target as SVGElement;
-    const touchAreaId = target.getAttribute("data-id");
-    
-    if (touchAreaId) {
-      puzzle.deleteTouchArea(touchAreaId);
-      updateCanvas();
-      updateConfigurationWarning();
-      e.preventDefault();
-    }
-  });
-}
-
 // Initialize when DOM is ready
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     initializeUI();
-    initializeDragAndDrop();
-    updateUI();
   });
 } else {
   initializeUI();
-  initializeDragAndDrop();
-  updateUI();
 }

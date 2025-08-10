@@ -1,6 +1,7 @@
 import type { Point, Objects, VirtualObject, VirtualRoom } from "./types";
 
 export class ReflectionEngine {
+  // TODO: let's refer to a constants.ts file that can contain varibles used across multiple classes
   private roomWidth: number = 200;
   private roomHeight: number = 200;
 
@@ -8,10 +9,13 @@ export class ReflectionEngine {
   calculateVirtualObjects(
     objects: Objects,
     _mirrors: boolean[], // [top, right, bottom, left]
-    _maxDepth: number
+    _maxDepth: number,
   ): { virtualObjects: VirtualObject[]; virtualRooms: VirtualRoom[] } {
     const virtualObjects: VirtualObject[] = [];
     const virtualRooms: VirtualRoom[] = [];
+    
+    console.log("calculateVirtualObjects called with mirrors:", _mirrors);
+    console.log("Objects:", objects);
 
     // Step 1: Create first-order virtual rooms
     const baseRoom: VirtualRoom = {
@@ -60,8 +64,8 @@ export class ReflectionEngine {
     }
 
     // Step 2: For each virtual room, calculate object reflections
+    console.log("Virtual rooms created:", virtualRooms.length);
     virtualRooms.forEach((room) => {
-      if (room.depth === 0) return; // Skip base room
 
       // Determine which mirror created this room based on position
       let mirrorSide: "top" | "right" | "bottom" | "left";
@@ -70,6 +74,7 @@ export class ReflectionEngine {
       else if (room.position.y > 0) mirrorSide = "bottom";
       else mirrorSide = "left";
 
+      console.log("Processing room at", room.position, "mirror side:", mirrorSide);
       const mirrorPos = this.getMirrorPosition(mirrorSide, baseRoom.position);
 
       virtualObjects.push(
@@ -78,28 +83,30 @@ export class ReflectionEngine {
           "triangle",
           mirrorSide,
           room.depth,
-          mirrorPos
+          mirrorPos,
         ),
         this.reflectAcrossMirror(
           objects.viewer.position,
           "viewer",
           mirrorSide,
           room.depth,
-          mirrorPos
-        )
+          mirrorPos,
+        ),
       );
     });
 
     // For now, limiting to depth 1 for the skeleton
     // TODO: Implement depth 2+ reflections
 
+    console.log("Returning virtualObjects:", virtualObjects);
+    console.log("Returning virtualRooms:", virtualRooms);
     return { virtualObjects, virtualRooms };
   }
 
   // Helper to get mirror position in world coordinates
   getMirrorPosition(
     side: "top" | "right" | "bottom" | "left",
-    roomPos: Point
+    roomPos: Point,
   ): number {
     switch (side) {
       case "top":
@@ -120,7 +127,7 @@ export class ReflectionEngine {
     mirrorSide: "top" | "right" | "bottom" | "left",
     depth: number,
     mirrorPosition?: number,
-    baseFlips?: { flippedX: boolean; flippedY: boolean }
+    baseFlips?: { flippedX: boolean; flippedY: boolean },
   ): VirtualObject {
     const reflected = { ...position };
     let flippedX = baseFlips?.flippedX || false;
@@ -164,7 +171,7 @@ export class ReflectionEngine {
   calculateRayPath(
     virtualObject: VirtualObject,
     viewer: Point,
-    _mirrors: boolean[]
+    _mirrors: boolean[],
   ): Point[] {
     const path: Point[] = [];
 
@@ -182,7 +189,7 @@ export class ReflectionEngine {
       const intersection = this.getRayMirrorIntersection(
         virtualObject.position,
         viewer,
-        mirrorSide
+        mirrorSide,
       );
       if (intersection) {
         path.push(intersection);
@@ -204,7 +211,7 @@ export class ReflectionEngine {
   getRayMirrorIntersection(
     from: Point,
     to: Point,
-    mirrorSide: "top" | "right" | "bottom" | "left"
+    mirrorSide: "top" | "right" | "bottom" | "left",
   ): Point | null {
     // Line equation: P = from + t * (to - from), where t ∈ [0,1]
     // We solve for t when the line crosses the mirror
@@ -254,3 +261,4 @@ export class ReflectionEngine {
     return null;
   }
 }
+
