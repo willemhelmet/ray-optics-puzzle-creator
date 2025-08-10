@@ -196,8 +196,16 @@ export class P5Renderer {
       this.drawTouchArea(area, selectedAreas.includes(area.id), mode, submissionResult);
     });
     
+    // Draw ray paths for selected virtual objects
+    const selectedRayObjects = this.puzzle.getSelectedVirtualObjectsForRay();
+    virtualData.virtualObjects.forEach((vObj) => {
+      if (vObj.rayPath && selectedRayObjects.has(vObj.id)) {
+        this.drawRayPath(vObj.rayPath, vObj.id === this.hoveredVirtualTriangle?.id);
+      }
+    });
+    
     // Draw ray from hovered virtual triangle to viewer (edit mode only)
-    if (this.hoveredVirtualTriangle && mode === "edit") {
+    if (this.hoveredVirtualTriangle && mode === "edit" && !selectedRayObjects.has(this.hoveredVirtualTriangle.id)) {
       this.drawRayToViewer(this.hoveredVirtualTriangle, objects.viewer);
     }
     
@@ -240,11 +248,24 @@ export class P5Renderer {
       y: vObj.position.y + this.offset
     };
     
-    // Check if this object is being hovered
+    // Check if this object is being hovered or has ray path active
     const isHovered = this.hoveredVirtualTriangle && this.hoveredVirtualTriangle.id === vObj.id;
+    const hasRayPath = this.puzzle.getSelectedVirtualObjectsForRay().has(vObj.id);
+    const mode = this.puzzle.getMode();
     
     if (vObj.sourceType === "triangle") {
       this.drawTriangleAtCanvasPos(canvasPos, true, vObj.opacity, vObj.flippedX, vObj.flippedY, isHovered || false);
+      
+      // Draw an indicator if ray path is active (ONLY in edit mode)
+      if (hasRayPath && mode === "edit") {
+        const p = this.p;
+        p.push();
+        p.noFill();
+        p.stroke(255, 165, 0, 200); // Orange outline
+        p.strokeWeight(2);
+        p.circle(canvasPos.x, canvasPos.y, 30); // Circle around the triangle
+        p.pop();
+      }
     } else if (vObj.sourceType === "viewer") {
       this.drawViewerAtCanvasPos(canvasPos, true, vObj.opacity);
     }
@@ -415,6 +436,25 @@ export class P5Renderer {
     const mode = this.puzzle.getMode();
     const mouseX = this.p.mouseX;
     const mouseY = this.p.mouseY;
+    
+    // Check for clicks on virtual objects (ONLY in edit mode)
+    if (mode === "edit") {
+      const virtualData = this.puzzle.getVirtualObjects();
+      for (const vObj of virtualData.virtualObjects) {
+        if (vObj.sourceType === "triangle") {
+          const canvasPos = {
+            x: vObj.position.x + this.offset,
+            y: vObj.position.y + this.offset
+          };
+          
+          if (this.p.dist(mouseX, mouseY, canvasPos.x, canvasPos.y) < 15) {
+            // Toggle ray path for this virtual object
+            this.puzzle.toggleVirtualObjectRayPath(vObj.id);
+            return;
+          }
+        }
+      }
+    }
     
     if (mode === "edit") {
       // Check if clicking on an object
@@ -589,6 +629,52 @@ export class P5Renderer {
       }
     });
     
+  }
+  
+  private drawRayPath(rayPath: Point[], isHovered: boolean = false): void {
+    const p = this.p;
+    
+    if (rayPath.length < 2) return;
+    
+    p.push();
+    // Use different colors for hovered vs non-hovered
+    if (isHovered) {
+      p.stroke(255, 200, 0, 220); // Brighter orange for hovered
+      p.strokeWeight(3);
+    } else {
+      p.stroke(255, 165, 0, 180); // Orange for normal
+      p.strokeWeight(2);
+    }
+    
+    // Draw the path segments
+    for (let i = 0; i < rayPath.length - 1; i++) {
+      const fromPoint = this.roomToCanvas(rayPath[i].x, rayPath[i].y);
+      const toPoint = this.roomToCanvas(rayPath[i + 1].x, rayPath[i + 1].y);
+      
+      p.line(fromPoint.x, fromPoint.y, toPoint.x, toPoint.y);
+      
+      // Draw a small circle at bounce points (not at start or end)
+      if (i > 0 && i < rayPath.length - 1) {
+        p.push();
+        p.noStroke();
+        if (isHovered) {
+          p.fill(255, 200, 0, 255);
+        } else {
+          p.fill(255, 165, 0, 255);
+        }
+        p.circle(fromPoint.x, fromPoint.y, 8);
+        p.pop();
+      }
+    }
+    
+    // Add arrow at the viewer end to show direction
+    const lastSegmentStart = rayPath[rayPath.length - 2];
+    const lastSegmentEnd = rayPath[rayPath.length - 1];
+    const startPoint = this.roomToCanvas(lastSegmentStart.x, lastSegmentStart.y);
+    const endPoint = this.roomToCanvas(lastSegmentEnd.x, lastSegmentEnd.y);
+    this.drawArrow(startPoint, endPoint, isHovered ? 255 : 255, isHovered ? 200 : 165, 0);
+    
+    p.pop();
   }
   
   private drawArrow(from: Point, to: Point, r: number, g: number, b: number): void {

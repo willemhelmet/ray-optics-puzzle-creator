@@ -60,7 +60,7 @@ export interface PuzzleState {
   content: Content;
 
   // Visualization settings
-  selectedVirtualObjectForRay: string | null; // ID of virtual object to show ray for
+  selectedVirtualObjectsForRay: Set<string>; // IDs of virtual objects to show rays for
   maxReflectionDepth: 3; // Limit for performance
 }
 

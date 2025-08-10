@@ -35,7 +35,7 @@ export class MirrorPuzzle {
         correctFeedback: "",
         incorrectFeedback: "",
       },
-      selectedVirtualObjectForRay: null,
+      selectedVirtualObjectsForRay: new Set(),
       maxReflectionDepth: 3,
     };
 
@@ -197,14 +197,21 @@ export class MirrorPuzzle {
     return { ...this.state.content };
   }
 
-  // Ray visualization (edit mode only)
-  selectVirtualObjectForRay(virtualObjectId: string | null): void {
-    if (this.state.mode !== "edit") return;
-    this.state.selectedVirtualObjectForRay = virtualObjectId;
+  // Ray visualization (works in both edit and play modes)
+  toggleVirtualObjectRayPath(virtualObjectId: string): void {
+    if (this.state.selectedVirtualObjectsForRay.has(virtualObjectId)) {
+      this.state.selectedVirtualObjectsForRay.delete(virtualObjectId);
+    } else {
+      this.state.selectedVirtualObjectsForRay.add(virtualObjectId);
+    }
   }
 
-  getSelectedVirtualObject(): string | null {
-    return this.state.selectedVirtualObjectForRay;
+  getSelectedVirtualObjectsForRay(): Set<string> {
+    return this.state.selectedVirtualObjectsForRay;
+  }
+  
+  clearRayPaths(): void {
+    this.state.selectedVirtualObjectsForRay.clear();
   }
 
   // Virtual object queries (read-only, both modes)
@@ -218,10 +225,10 @@ export class MirrorPuzzle {
       this.state.maxReflectionDepth,
     );
 
-    // Calculate ray paths for objects if needed
-    if (this.state.selectedVirtualObjectForRay) {
+    // Calculate ray paths for selected objects
+    this.state.selectedVirtualObjectsForRay.forEach(virtualObjectId => {
       const selectedObject = result.virtualObjects.find(
-        (vo) => vo.id === this.state.selectedVirtualObjectForRay,
+        (vo) => vo.id === virtualObjectId,
       );
       if (selectedObject) {
         // Get the real object position based on the source type
@@ -236,7 +243,7 @@ export class MirrorPuzzle {
           this.state.room.mirrors,
         );
       }
-    }
+    });
 
     return result;
   }
