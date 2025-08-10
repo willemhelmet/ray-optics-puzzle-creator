@@ -26,9 +26,13 @@ export class P5Renderer {
   private dashOffset = 0; // For animated dashed line
   private reflectionEngine: ReflectionEngine;
   
-  constructor(puzzle: MirrorPuzzle, containerId: string) {
+  // Callback for touch area changes
+  private onTouchAreaChange?: () => void;
+  
+  constructor(puzzle: MirrorPuzzle, containerId: string, onTouchAreaChange?: () => void) {
     this.puzzle = puzzle;
     this.reflectionEngine = new ReflectionEngine();
+    this.onTouchAreaChange = onTouchAreaChange;
     
     // Create p5 sketch
     const sketch = (p: p5) => {
@@ -38,13 +42,24 @@ export class P5Renderer {
         this.canvas = p.createCanvas(this.canvasSize, this.canvasSize);
         this.canvas.parent(containerId);
         p.frameRate(30);
+        
+        // Prevent context menu on right-click
+        this.canvas.elt.addEventListener('contextmenu', (e: Event) => {
+          e.preventDefault();
+          return false;
+        });
       };
       
       p.draw = () => {
         this.render();
       };
       
-      p.mousePressed = () => {
+      p.mousePressed = (_event?: object) => {
+        // Check for right-click
+        if (this.p.mouseButton === this.p.RIGHT) {
+          this.handleRightClick();
+          return false; // Prevent default
+        }
         this.handleMouseDown();
       };
       
@@ -60,14 +75,6 @@ export class P5Renderer {
         // Only detect hover when not dragging
         if (this.puzzle.getMode() === "edit" && !this.isDragging) {
           this.detectHoveredTriangle();
-        }
-      };
-      
-      // Right-click for deleting touch areas
-      p.mouseClicked = (event: MouseEvent) => {
-        if (event.button === 2) { // Right click
-          this.handleRightClick();
-          return false; // Prevent context menu
         }
       };
     };
@@ -500,6 +507,7 @@ export class P5Renderer {
       const area = touchAreas.find(a => a.id === this.draggedTouchArea);
       if (area) {
         this.puzzle.setTouchAreaCorrect(this.draggedTouchArea, !area.isCorrect);
+        this.onTouchAreaChange?.();
       }
     }
     
@@ -519,6 +527,7 @@ export class P5Renderer {
     for (const area of touchAreas) {
       if (this.isPointInTouchArea(mouseX, mouseY, area)) {
         this.puzzle.deleteTouchArea(area.id);
+        this.onTouchAreaChange?.();
         return;
       }
     }

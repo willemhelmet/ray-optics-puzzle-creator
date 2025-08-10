@@ -276,6 +276,19 @@ export class MirrorPuzzle {
       };
     }
 
+    // Check if there are any correct areas defined
+    const hasCorrectAreas = this.state.touchAreas.some(ta => ta.isCorrect);
+    if (!hasCorrectAreas && this.state.touchAreas.length > 0) {
+      // Only incorrect areas exist - this is an error in puzzle design
+      return {
+        isCorrect: false,
+        selectedCorrect: [],
+        selectedIncorrect: [],
+        missedCorrect: [],
+        message: "Error: No correct answers defined in this puzzle",
+      };
+    }
+
     const selectedCorrect: string[] = [];
     const selectedIncorrect: string[] = [];
     const missedCorrect: string[] = [];

@@ -9,7 +9,9 @@ let renderer: P5Renderer | null = null;
 // Initialize UI elements
 function initializeUI() {
   // Initialize the P5 renderer
-  renderer = new P5Renderer(puzzle, "p5-canvas-container");
+  renderer = new P5Renderer(puzzle, "p5-canvas-container", () => {
+    updateConfigurationWarning();
+  });
   
   // Mode buttons
   const editModeBtn = document.getElementById("edit-mode-btn") as HTMLButtonElement;
