@@ -108,6 +108,7 @@ function initializeUI() {
   
   resetBtn?.addEventListener("click", () => {
     puzzle.resetPuzzle();
+    puzzle.clearSubmissionResult();
     updateUI();
   });
   
@@ -156,6 +157,9 @@ function updateModeUI() {
   if (feedbackContainer) feedbackContainer.style.display = "none";
   if (explanationContainer) explanationContainer.style.display = "none";
   if (submitBtn) submitBtn.style.display = "block";
+  
+  // Clear submission result when switching modes
+  puzzle.clearSubmissionResult();
 }
 
 function updateMirrorVisualization() {
@@ -198,8 +202,9 @@ function showFeedback(result: any) {
   feedbackContainer.style.display = "block";
   if (submitBtn) submitBtn.style.display = "none";
   
-  // Update touch area visuals based on results
-  // TODO: Implement visual feedback on touch areas
+  // Store the submission result for rendering
+  puzzle.storeSubmissionResult(result);
+  updateCanvas();
 }
 
 function updateCanvas() {
@@ -382,12 +387,82 @@ function updateCanvas() {
   const touchAreas = puzzle.getAllTouchAreas();
   const selectedAreas = puzzle.getSelectedTouchAreas();
   const mode = puzzle.getMode();
+  const submissionResult = puzzle.getSubmissionResult();
   
   touchAreas.forEach((area) => {
     // Touch areas can be anywhere on canvas, not restricted to room
     const areaX = area.position.x;
     const areaY = area.position.y;
     const size = 60; // Size of the square touch area
+    
+    // Check if we have submission feedback to show
+    const hasSubmissionFeedback = mode === "play" && submissionResult;
+    
+    // Determine the visual state based on submission result
+    let fillColor, strokeColor, strokeWidth, opacity = "1";
+    let showIndicator = false;
+    let indicatorColor = "";
+    let indicatorSymbol = "";
+    
+    if (mode === "edit") {
+      // Edit mode: show correct/incorrect status with lighter fill
+      fillColor = area.isCorrect ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)";
+      strokeColor = area.isCorrect ? "#4caf50" : "#f44336";
+      strokeWidth = "2";
+      showIndicator = true;
+      indicatorColor = area.isCorrect ? "#4caf50" : "#f44336";
+      indicatorSymbol = area.isCorrect ? "✓" : "✗";
+    } else if (hasSubmissionFeedback) {
+      // Play mode with submission feedback
+      const isSelected = selectedAreas.includes(area.id);
+      
+      if (!isSelected) {
+        // Unselected areas become invisible
+        opacity = "0";
+        fillColor = "transparent";
+        strokeColor = "transparent";
+        strokeWidth = "0";
+      } else if (submissionResult.isCorrect) {
+        // User got everything correct - all selected areas are green
+        fillColor = "rgba(76, 175, 80, 0.3)";
+        strokeColor = "#4caf50";
+        strokeWidth = "3";
+        showIndicator = true;
+        indicatorColor = "#4caf50";
+        indicatorSymbol = "✓";
+      } else {
+        // User made mistakes - check each area
+        if (submissionResult.selectedCorrect.includes(area.id)) {
+          // Correctly selected area but answer is wrong overall - grey
+          fillColor = "rgba(158, 158, 158, 0.3)";
+          strokeColor = "#757575";
+          strokeWidth = "3";
+          showIndicator = true;
+          indicatorColor = "#757575";
+          indicatorSymbol = "✓";
+        } else if (submissionResult.selectedIncorrect.includes(area.id)) {
+          // Incorrectly selected area - yellow/orange
+          fillColor = "rgba(255, 193, 7, 0.3)";
+          strokeColor = "#ff9800";
+          strokeWidth = "3";
+          showIndicator = true;
+          indicatorColor = "#ff9800";
+          indicatorSymbol = "✗";
+        } else {
+          // This shouldn't happen for selected areas
+          opacity = "0";
+          fillColor = "transparent";
+          strokeColor = "transparent";
+          strokeWidth = "0";
+        }
+      }
+    } else {
+      // Play mode without submission - normal selection state
+      const isSelected = selectedAreas.includes(area.id);
+      fillColor = isSelected ? "rgba(33, 150, 243, 0.3)" : "rgba(158, 158, 158, 0.05)";
+      strokeColor = isSelected ? "#2196f3" : "#999999";
+      strokeWidth = isSelected ? "3" : "2";
+    }
     
     // Create rounded rectangle
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -397,35 +472,24 @@ function updateCanvas() {
     rect.setAttribute("height", String(size));
     rect.setAttribute("rx", "8"); // Rounded corners
     rect.setAttribute("ry", "8");
+    rect.setAttribute("opacity", opacity);
     
     if (mode === "edit") {
-      // Edit mode: show correct/incorrect status with lighter fill
-      rect.setAttribute("fill", area.isCorrect ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)");
-      rect.setAttribute("stroke", area.isCorrect ? "#4caf50" : "#f44336");
-      rect.setAttribute("stroke-width", "2");
-      rect.setAttribute("style", "cursor: move");
+      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: move; opacity: ${opacity}`);
       rect.setAttribute("title", "Click to toggle correct/incorrect, Drag to move, Right-click to delete");
+    } else if (hasSubmissionFeedback) {
+      // Disable interaction after submission
+      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: default; opacity: ${opacity}; pointer-events: none;`);
     } else {
-      // Play mode: show selection status
-      const isSelected = selectedAreas.includes(area.id);
-      
-      // Use inline style to force rendering
-      const fillColor = isSelected ? "rgba(33, 150, 243, 0.3)" : "rgba(158, 158, 158, 0.05)";
-      const strokeColor = isSelected ? "#2196f3" : "#999999";
-      const strokeWidth = isSelected ? "3" : "2";
-      
-      rect.setAttribute("fill", fillColor);
-      rect.setAttribute("stroke", strokeColor);
-      rect.setAttribute("stroke-width", strokeWidth);
-      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: pointer;`);
+      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: pointer; opacity: ${opacity}`);
     }
     
     rect.setAttribute("class", "touch-area");
     rect.setAttribute("data-id", area.id);
     touchAreasGroup.appendChild(rect);
     
-    // Add checkmark or X in top-right corner for edit mode
-    if (mode === "edit") {
+    // Add checkmark or X in top-right corner when needed
+    if (showIndicator && opacity !== "0") {
       // Background circle for the indicator
       const indicatorBg = document.createElementNS("http://www.w3.org/2000/svg", "circle");
       const indicatorX = areaX + size/2 - 10;
@@ -433,7 +497,7 @@ function updateCanvas() {
       indicatorBg.setAttribute("cx", String(indicatorX));
       indicatorBg.setAttribute("cy", String(indicatorY));
       indicatorBg.setAttribute("r", "10");
-      indicatorBg.setAttribute("fill", area.isCorrect ? "#4caf50" : "#f44336");
+      indicatorBg.setAttribute("fill", indicatorColor);
       indicatorBg.setAttribute("pointer-events", "none");
       touchAreasGroup.appendChild(indicatorBg);
       
@@ -446,7 +510,7 @@ function updateCanvas() {
       symbol.setAttribute("font-weight", "bold");
       symbol.setAttribute("fill", "white");
       symbol.setAttribute("pointer-events", "none");
-      symbol.textContent = area.isCorrect ? "✓" : "✗";
+      symbol.textContent = indicatorSymbol;
       touchAreasGroup.appendChild(symbol);
     }
   });

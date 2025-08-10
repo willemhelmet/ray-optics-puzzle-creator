@@ -13,6 +13,7 @@ export class MirrorPuzzle {
   private state: PuzzleState;
   private reflectionEngine: ReflectionEngine;
   private selectedTouchAreas: Set<string> = new Set();
+  private submissionResult: ValidationResult | null = null;
 
   constructor() {
     // Initialize with default state
@@ -29,10 +30,10 @@ export class MirrorPuzzle {
       },
       touchAreas: [],
       content: {
-        problemText: "Click where you see reflections of the triangle",
-        explanationText: "Light bounces off mirrors to create virtual images. The virtual images appear at the same distance behind the mirror as the object is in front of it.",
-        correctFeedback: "Correct!",
-        incorrectFeedback: "Try again!",
+        problemText: "",
+        explanationText: "",
+        correctFeedback: "",
+        incorrectFeedback: "",
       },
       selectedVirtualObjectForRay: null,
       maxReflectionDepth: 3,
@@ -44,8 +45,9 @@ export class MirrorPuzzle {
   // Mode management
   setMode(mode: "edit" | "play"): void {
     this.state.mode = mode;
-    // Clear selections when switching modes
+    // Clear selections and submission result when switching modes
     this.selectedTouchAreas.clear();
+    this.submissionResult = null;
   }
 
   getMode(): "edit" | "play" {
@@ -56,21 +58,27 @@ export class MirrorPuzzle {
   getObjects(): { triangle: Point; viewer: Point } {
     return {
       triangle: { ...this.state.objects.triangle.position },
-      viewer: { ...this.state.objects.viewer.position }
+      viewer: { ...this.state.objects.viewer.position },
     };
   }
 
   // Object management (edit mode only)
   moveObject(type: "triangle" | "viewer", position: Point): void {
     if (this.state.mode !== "edit") return;
-    
+
     // Ensure position is within room bounds with padding
     const padding = 20;
     const clampedPosition = {
-      x: Math.max(padding, Math.min(this.state.room.width - padding, position.x)),
-      y: Math.max(padding, Math.min(this.state.room.height - padding, position.y)),
+      x: Math.max(
+        padding,
+        Math.min(this.state.room.width - padding, position.x),
+      ),
+      y: Math.max(
+        padding,
+        Math.min(this.state.room.height - padding, position.y),
+      ),
     };
-    
+
     this.state.objects[type].position = clampedPosition;
   }
 
@@ -81,7 +89,7 @@ export class MirrorPuzzle {
   // Touch area management (edit mode only)
   addTouchArea(position?: Point): string {
     if (this.state.mode !== "edit") return "";
-    
+
     const id = `touch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const touchArea: TouchArea = {
       id,
@@ -89,14 +97,14 @@ export class MirrorPuzzle {
       isCorrect: true, // Default to correct
       radius: 30,
     };
-    
+
     this.state.touchAreas.push(touchArea);
     return id;
   }
 
   moveTouchArea(id: string, position: Point): void {
     if (this.state.mode !== "edit") return;
-    
+
     const touchArea = this.state.touchAreas.find((ta) => ta.id === id);
     if (touchArea) {
       touchArea.position = position;
@@ -105,7 +113,7 @@ export class MirrorPuzzle {
 
   setTouchAreaCorrect(id: string, isCorrect: boolean): void {
     if (this.state.mode !== "edit") return;
-    
+
     const touchArea = this.state.touchAreas.find((ta) => ta.id === id);
     if (touchArea) {
       touchArea.isCorrect = isCorrect;
@@ -114,7 +122,7 @@ export class MirrorPuzzle {
 
   deleteTouchArea(id: string): void {
     if (this.state.mode !== "edit") return;
-    
+
     this.state.touchAreas = this.state.touchAreas.filter((ta) => ta.id !== id);
   }
 
@@ -125,14 +133,14 @@ export class MirrorPuzzle {
   // Mirror configuration (edit mode only)
   setMirror(side: "top" | "right" | "bottom" | "left", enabled: boolean): void {
     if (this.state.mode !== "edit") return;
-    
+
     const index = this.getMirrorIndex(side);
     this.state.room.mirrors[index] = enabled;
   }
 
   toggleMirror(side: "top" | "right" | "bottom" | "left"): void {
     if (this.state.mode !== "edit") return;
-    
+
     const index = this.getMirrorIndex(side);
     this.state.room.mirrors[index] = !this.state.room.mirrors[index];
   }
@@ -153,10 +161,14 @@ export class MirrorPuzzle {
 
   private getMirrorIndex(side: "top" | "right" | "bottom" | "left"): number {
     switch (side) {
-      case "top": return 0;
-      case "right": return 1;
-      case "bottom": return 2;
-      case "left": return 3;
+      case "top":
+        return 0;
+      case "right":
+        return 1;
+      case "bottom":
+        return 2;
+      case "left":
+        return 3;
     }
   }
 
@@ -196,27 +208,30 @@ export class MirrorPuzzle {
   }
 
   // Virtual object queries (read-only, both modes)
-  getVirtualObjects(): { virtualObjects: VirtualObject[]; virtualRooms: VirtualRoom[] } {
+  getVirtualObjects(): {
+    virtualObjects: VirtualObject[];
+    virtualRooms: VirtualRoom[];
+  } {
     const result = this.reflectionEngine.calculateVirtualObjects(
       this.state.objects,
       this.state.room.mirrors,
-      this.state.maxReflectionDepth
+      this.state.maxReflectionDepth,
     );
-    
+
     // Calculate ray paths for objects if needed
     if (this.state.selectedVirtualObjectForRay) {
       const selectedObject = result.virtualObjects.find(
-        (vo) => vo.id === this.state.selectedVirtualObjectForRay
+        (vo) => vo.id === this.state.selectedVirtualObjectForRay,
       );
       if (selectedObject) {
         selectedObject.rayPath = this.reflectionEngine.calculateRayPath(
           selectedObject,
           this.state.objects.viewer.position,
-          this.state.room.mirrors
+          this.state.room.mirrors,
         );
       }
     }
-    
+
     return result;
   }
 
@@ -224,7 +239,7 @@ export class MirrorPuzzle {
     const result = this.reflectionEngine.calculateVirtualObjects(
       this.state.objects,
       this.state.room.mirrors,
-      this.state.maxReflectionDepth
+      this.state.maxReflectionDepth,
     );
     return result.virtualRooms;
   }
@@ -278,22 +293,44 @@ export class MirrorPuzzle {
       }
     }
 
-    const isCorrect = selectedIncorrect.length === 0 && missedCorrect.length === 0;
-    const message = isCorrect 
-      ? (this.state.content.correctFeedback || "Correct!")
-      : (this.state.content.incorrectFeedback || "Try again!");
+    const isCorrect =
+      selectedIncorrect.length === 0 && missedCorrect.length === 0;
+    const message = isCorrect
+      ? this.state.content.correctFeedback || "Correct!"
+      : this.state.content.incorrectFeedback || "Try again!";
 
-    return {
+    const result = {
       isCorrect,
       selectedCorrect,
       selectedIncorrect,
       missedCorrect,
       message,
     };
+
+    // Store the submission result for rendering
+    this.submissionResult = result;
+
+    return result;
   }
 
   resetPuzzle(): void {
     this.selectedTouchAreas.clear();
+    this.submissionResult = null;
+  }
+
+  // Store submission result for rendering feedback
+  storeSubmissionResult(result: ValidationResult): void {
+    this.submissionResult = result;
+  }
+
+  // Get stored submission result
+  getSubmissionResult(): ValidationResult | null {
+    return this.submissionResult;
+  }
+
+  // Clear submission result
+  clearSubmissionResult(): void {
+    this.submissionResult = null;
   }
 
   // Export/Import
@@ -337,7 +374,8 @@ export class MirrorPuzzle {
       warnings.push("5+ touch areas - puzzle is getting too complex");
     }
 
-    const isValid = warnings.length === 0 || 
+    const isValid =
+      warnings.length === 0 ||
       (warnings.length === 1 && warnings[0].includes("getting too complex"));
     const message = warnings.join(" • ");
 
@@ -373,3 +411,4 @@ export class MirrorPuzzle {
     return this.state;
   }
 }
+
