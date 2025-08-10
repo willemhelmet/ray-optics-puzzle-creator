@@ -14,11 +14,13 @@ function initializeUI() {
   editModeBtn?.addEventListener("click", () => {
     puzzle.setMode("edit");
     updateModeUI();
+    updateCanvas();
   });
   
   playModeBtn?.addEventListener("click", () => {
     puzzle.setMode("play");
     updateModeUI();
+    updateCanvas();
   });
 
   // Export/Import buttons
@@ -89,7 +91,7 @@ function initializeUI() {
   // Touch area button
   const addTouchAreaBtn = document.getElementById("add-touch-area-btn") as HTMLButtonElement;
   addTouchAreaBtn?.addEventListener("click", () => {
-    puzzle.addTouchArea({ x: 100, y: 100 });
+    puzzle.addTouchArea(); // Use default position (center of canvas)
     updateCanvas();
     updateConfigurationWarning();
   });
@@ -376,24 +378,78 @@ function updateCanvas() {
     }
   });
 
-  // Draw touch areas in edit mode
-  if (puzzle.getMode() === "edit") {
-    const touchAreas = puzzle.getAllTouchAreas();
-    touchAreas.forEach((area) => {
-      const areaPos = roomToCanvas(area.position.x, area.position.y);
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", String(areaPos.x));
-      circle.setAttribute("cy", String(areaPos.y));
-      circle.setAttribute("r", String(area.radius));
-      circle.setAttribute("fill", area.isCorrect ? "rgba(76, 175, 80, 0.3)" : "rgba(244, 67, 54, 0.3)");
-      circle.setAttribute("stroke", area.isCorrect ? "#4caf50" : "#f44336");
-      circle.setAttribute("stroke-width", "2");
-      circle.setAttribute("stroke-dasharray", "5,5");
-      circle.setAttribute("class", "touch-area");
-      circle.setAttribute("data-id", area.id);
-      touchAreasGroup.appendChild(circle);
-    });
-  }
+  // Draw touch areas
+  const touchAreas = puzzle.getAllTouchAreas();
+  const selectedAreas = puzzle.getSelectedTouchAreas();
+  const mode = puzzle.getMode();
+  
+  touchAreas.forEach((area) => {
+    // Touch areas can be anywhere on canvas, not restricted to room
+    const areaX = area.position.x;
+    const areaY = area.position.y;
+    const size = 60; // Size of the square touch area
+    
+    // Create rounded rectangle
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", String(areaX - size/2));
+    rect.setAttribute("y", String(areaY - size/2));
+    rect.setAttribute("width", String(size));
+    rect.setAttribute("height", String(size));
+    rect.setAttribute("rx", "8"); // Rounded corners
+    rect.setAttribute("ry", "8");
+    
+    if (mode === "edit") {
+      // Edit mode: show correct/incorrect status with lighter fill
+      rect.setAttribute("fill", area.isCorrect ? "rgba(76, 175, 80, 0.2)" : "rgba(244, 67, 54, 0.2)");
+      rect.setAttribute("stroke", area.isCorrect ? "#4caf50" : "#f44336");
+      rect.setAttribute("stroke-width", "2");
+      rect.setAttribute("style", "cursor: move");
+      rect.setAttribute("title", "Click to toggle correct/incorrect, Drag to move, Right-click to delete");
+    } else {
+      // Play mode: show selection status
+      const isSelected = selectedAreas.includes(area.id);
+      
+      // Use inline style to force rendering
+      const fillColor = isSelected ? "rgba(33, 150, 243, 0.3)" : "rgba(158, 158, 158, 0.05)";
+      const strokeColor = isSelected ? "#2196f3" : "#999999";
+      const strokeWidth = isSelected ? "3" : "2";
+      
+      rect.setAttribute("fill", fillColor);
+      rect.setAttribute("stroke", strokeColor);
+      rect.setAttribute("stroke-width", strokeWidth);
+      rect.setAttribute("style", `fill: ${fillColor}; stroke: ${strokeColor}; stroke-width: ${strokeWidth}; cursor: pointer;`);
+    }
+    
+    rect.setAttribute("class", "touch-area");
+    rect.setAttribute("data-id", area.id);
+    touchAreasGroup.appendChild(rect);
+    
+    // Add checkmark or X in top-right corner for edit mode
+    if (mode === "edit") {
+      // Background circle for the indicator
+      const indicatorBg = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      const indicatorX = areaX + size/2 - 10;
+      const indicatorY = areaY - size/2 + 10;
+      indicatorBg.setAttribute("cx", String(indicatorX));
+      indicatorBg.setAttribute("cy", String(indicatorY));
+      indicatorBg.setAttribute("r", "10");
+      indicatorBg.setAttribute("fill", area.isCorrect ? "#4caf50" : "#f44336");
+      indicatorBg.setAttribute("pointer-events", "none");
+      touchAreasGroup.appendChild(indicatorBg);
+      
+      // Checkmark or X symbol
+      const symbol = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      symbol.setAttribute("x", String(indicatorX));
+      symbol.setAttribute("y", String(indicatorY + 4));
+      symbol.setAttribute("text-anchor", "middle");
+      symbol.setAttribute("font-size", "14");
+      symbol.setAttribute("font-weight", "bold");
+      symbol.setAttribute("fill", "white");
+      symbol.setAttribute("pointer-events", "none");
+      symbol.textContent = area.isCorrect ? "✓" : "✗";
+      touchAreasGroup.appendChild(symbol);
+    }
+  });
 }
 
 function createGroup(parent: SVGElement, id: string): SVGGElement {
@@ -453,7 +509,10 @@ function initializeDragAndDrop() {
 
   let isDragging = false;
   let draggedObject: "triangle" | "viewer" | null = null;
+  let draggedTouchArea: string | null = null;
   let dragOffset = { x: 0, y: 0 };
+  let mouseDownPos = { x: 0, y: 0 };
+  let hasMoved = false;
 
   // Constants for room and canvas dimensions
   const roomSize = 200;
@@ -506,53 +565,150 @@ function initializeDragAndDrop() {
 
   // Mouse down handler
   canvas.addEventListener("mousedown", (e: MouseEvent) => {
-    if (puzzle.getMode() !== "edit") return;
-
     const target = e.target as SVGElement;
-    const objectType = target.getAttribute("data-object");
+    const mode = puzzle.getMode();
     
-    if (objectType === "triangle" || objectType === "viewer") {
-      isDragging = true;
-      draggedObject = objectType as "triangle" | "viewer";
+    if (mode === "edit") {
+      const objectType = target.getAttribute("data-object");
+      const touchAreaId = target.getAttribute("data-id");
       
-      const mousePos = getMousePos(e);
-      const objects = puzzle.getObjects();
-      const objPos = draggedObject === "triangle" ? objects.triangle : objects.viewer;
-      
-      // Calculate offset between mouse and object center
-      dragOffset = {
-        x: mousePos.x - (objPos.x + canvasOffset),
-        y: mousePos.y - (objPos.y + canvasOffset)
-      };
-      
-      e.preventDefault();
+      if (objectType === "triangle" || objectType === "viewer") {
+        // Start dragging object
+        isDragging = true;
+        draggedObject = objectType as "triangle" | "viewer";
+        
+        const mousePos = getMousePos(e);
+        const objects = puzzle.getObjects();
+        const objPos = draggedObject === "triangle" ? objects.triangle : objects.viewer;
+        
+        dragOffset = {
+          x: mousePos.x - (objPos.x + canvasOffset),
+          y: mousePos.y - (objPos.y + canvasOffset)
+        };
+        
+        e.preventDefault();
+      } else if (touchAreaId) {
+        // Prepare for potential drag
+        const mousePos = getMousePos(e);
+        mouseDownPos = { x: mousePos.x, y: mousePos.y };
+        hasMoved = false;
+        draggedTouchArea = touchAreaId;
+        
+        const touchAreas = puzzle.getAllTouchAreas();
+        const area = touchAreas.find(a => a.id === touchAreaId);
+        
+        if (area) {
+          dragOffset = {
+            x: mousePos.x - area.position.x,
+            y: mousePos.y - area.position.y
+          };
+        }
+        
+        e.preventDefault();
+      }
+    } else if (mode === "play") {
+      // Handle touch area selection in play mode
+      const touchAreaId = target.getAttribute("data-id");
+      if (touchAreaId) {
+        const touchAreas = puzzle.getAllTouchAreas();
+        const area = touchAreas.find(a => a.id === touchAreaId);
+        if (area) {
+          // Toggle selection
+          const selected = puzzle.getSelectedTouchAreas();
+          if (selected.includes(touchAreaId)) {
+            puzzle.deselectTouchArea(touchAreaId);
+          } else {
+            puzzle.selectTouchArea(touchAreaId);
+          }
+          updateCanvas();
+        }
+        e.preventDefault();
+      }
     }
   });
 
   // Mouse move handler
   canvas.addEventListener("mousemove", (e: MouseEvent) => {
-    if (!isDragging || !draggedObject) return;
-    
     const mousePos = getMousePos(e);
-    const roomPos = canvasToRoom(mousePos.x - dragOffset.x, mousePos.y - dragOffset.y);
-    const constrainedPos = constrainPosition(roomPos.x, roomPos.y, draggedObject);
     
-    puzzle.moveObject(draggedObject, constrainedPos);
-    updateCanvas();
+    // Check if we should start dragging (mouse moved more than 5 pixels)
+    if (draggedTouchArea && !isDragging) {
+      const distance = Math.sqrt(
+        Math.pow(mousePos.x - mouseDownPos.x, 2) + 
+        Math.pow(mousePos.y - mouseDownPos.y, 2)
+      );
+      if (distance > 5) {
+        isDragging = true;
+        hasMoved = true;
+      }
+    }
+    
+    if (!isDragging) return;
+    
+    if (draggedObject) {
+      const roomPos = canvasToRoom(mousePos.x - dragOffset.x, mousePos.y - dragOffset.y);
+      const constrainedPos = constrainPosition(roomPos.x, roomPos.y, draggedObject);
+      puzzle.moveObject(draggedObject, constrainedPos);
+      updateCanvas();
+    } else if (draggedTouchArea) {
+      // Touch areas can be placed anywhere on the canvas
+      const canvasPos = {
+        x: mousePos.x - dragOffset.x,
+        y: mousePos.y - dragOffset.y
+      };
+      // Constrain to canvas bounds only
+      const constrainedPos = {
+        x: Math.max(30, Math.min(canvasSize - 30, canvasPos.x)),
+        y: Math.max(30, Math.min(canvasSize - 30, canvasPos.y))
+      };
+      puzzle.moveTouchArea(draggedTouchArea, constrainedPos);
+      updateCanvas();
+    }
     
     e.preventDefault();
   });
 
   // Mouse up handler
   canvas.addEventListener("mouseup", () => {
+    // If we have a touch area and didn't move, toggle it
+    if (draggedTouchArea && !hasMoved && puzzle.getMode() === "edit") {
+      const touchAreas = puzzle.getAllTouchAreas();
+      const area = touchAreas.find(a => a.id === draggedTouchArea);
+      if (area) {
+        puzzle.setTouchAreaCorrect(draggedTouchArea, !area.isCorrect);
+        updateCanvas();
+      }
+    }
+    
     isDragging = false;
     draggedObject = null;
+    draggedTouchArea = null;
+    hasMoved = false;
   });
 
   // Mouse leave handler (stop dragging if mouse leaves canvas)
   canvas.addEventListener("mouseleave", () => {
     isDragging = false;
     draggedObject = null;
+    draggedTouchArea = null;
+    hasMoved = false;
+  });
+  
+  // Remove the automatic touch area creation on canvas click
+  // Touch areas should only be created via the Add Touch Area button
+  
+  // Right-click handler for deleting touch areas
+  canvas.addEventListener("contextmenu", (e: MouseEvent) => {
+    if (puzzle.getMode() !== "edit") return;
+    
+    const target = e.target as SVGElement;
+    const touchAreaId = target.getAttribute("data-id");
+    
+    if (touchAreaId) {
+      puzzle.deleteTouchArea(touchAreaId);
+      updateCanvas();
+      e.preventDefault();
+    }
   });
 }
 

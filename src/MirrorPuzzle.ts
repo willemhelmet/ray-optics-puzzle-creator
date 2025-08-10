@@ -44,9 +44,8 @@ export class MirrorPuzzle {
   // Mode management
   setMode(mode: "edit" | "play"): void {
     this.state.mode = mode;
-    if (mode === "play") {
-      this.selectedTouchAreas.clear();
-    }
+    // Clear selections when switching modes
+    this.selectedTouchAreas.clear();
   }
 
   getMode(): "edit" | "play" {
@@ -86,7 +85,7 @@ export class MirrorPuzzle {
     const id = `touch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const touchArea: TouchArea = {
       id,
-      position: position || { x: 100, y: 100 }, // Default to center
+      position: position || { x: 400, y: 400 }, // Default to center of 800x800 canvas
       isCorrect: true, // Default to correct
       radius: 30,
     };
