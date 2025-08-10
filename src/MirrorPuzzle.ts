@@ -209,7 +209,7 @@ export class MirrorPuzzle {
   getSelectedVirtualObjectsForRay(): Set<string> {
     return this.state.selectedVirtualObjectsForRay;
   }
-  
+
   clearRayPaths(): void {
     this.state.selectedVirtualObjectsForRay.clear();
   }
@@ -226,16 +226,17 @@ export class MirrorPuzzle {
     );
 
     // Calculate ray paths for selected objects
-    this.state.selectedVirtualObjectsForRay.forEach(virtualObjectId => {
+    this.state.selectedVirtualObjectsForRay.forEach((virtualObjectId) => {
       const selectedObject = result.virtualObjects.find(
         (vo) => vo.id === virtualObjectId,
       );
       if (selectedObject) {
         // Get the real object position based on the source type
-        const realObjectPos = selectedObject.sourceType === 'triangle' 
-          ? this.state.objects.triangle.position
-          : this.state.objects.viewer.position;
-        
+        const realObjectPos =
+          selectedObject.sourceType === "triangle"
+            ? this.state.objects.triangle.position
+            : this.state.objects.viewer.position;
+
         selectedObject.rayPath = this.reflectionEngine.calculateRayPath(
           selectedObject,
           realObjectPos,
@@ -284,7 +285,7 @@ export class MirrorPuzzle {
     }
 
     // Check if there are any correct areas defined
-    const hasCorrectAreas = this.state.touchAreas.some(ta => ta.isCorrect);
+    const hasCorrectAreas = this.state.touchAreas.some((ta) => ta.isCorrect);
     if (!hasCorrectAreas && this.state.touchAreas.length > 0) {
       // Only incorrect areas exist - this is an error in puzzle design
       return {
@@ -364,7 +365,9 @@ export class MirrorPuzzle {
     // Convert Set to array for JSON serialization
     const stateForExport = {
       ...this.state,
-      selectedVirtualObjectsForRay: Array.from(this.state.selectedVirtualObjectsForRay)
+      selectedVirtualObjectsForRay: Array.from(
+        this.state.selectedVirtualObjectsForRay,
+      ),
     };
     return JSON.stringify(stateForExport, null, 2);
   }
@@ -392,10 +395,10 @@ export class MirrorPuzzle {
           // Old format - single string
           rayPathSet = new Set([importedState.selectedVirtualObjectForRay]);
         }
-        
+
         this.state = {
           ...importedState,
-          selectedVirtualObjectsForRay: rayPathSet
+          selectedVirtualObjectsForRay: rayPathSet,
         };
         this.selectedTouchAreas.clear();
       }
@@ -405,53 +408,58 @@ export class MirrorPuzzle {
   }
 
   // Configuration validation
-  validateConfiguration(): { 
-    isValid: boolean; 
-    warnings: Array<{ type: 'error' | 'warning' | 'info'; message: string }> 
+  validateConfiguration(): {
+    isValid: boolean;
+    warnings: Array<{ type: "error" | "warning" | "info"; message: string }>;
   } {
-    const warnings: Array<{ type: 'error' | 'warning' | 'info'; message: string }> = [];
+    const warnings: Array<{
+      type: "error" | "warning" | "info";
+      message: string;
+    }> = [];
 
     // Check for touch areas
     if (this.state.touchAreas.length === 0) {
-      warnings.push({ 
-        type: 'error', 
-        message: 'No touch areas defined - puzzle cannot be played' 
+      warnings.push({
+        type: "error",
+        message: "No touch areas defined - puzzle cannot be played",
       });
     } else {
       // Check for correct touch areas (only if there are touch areas)
       const hasCorrectArea = this.state.touchAreas.some((ta) => ta.isCorrect);
       if (!hasCorrectArea) {
-        warnings.push({ 
-          type: 'error', 
-          message: 'No correct touch areas defined - puzzle has no solution' 
+        warnings.push({
+          type: "error",
+          message: "No correct touch areas defined - puzzle has no solution",
         });
       }
     }
 
     // Check for complexity
     if (this.state.touchAreas.length >= 5) {
-      warnings.push({ 
-        type: 'warning', 
-        message: '5+ touch areas - puzzle is getting too complex' 
+      warnings.push({
+        type: "warning",
+        message: "5+ touch areas - puzzle is getting too complex",
       });
     }
 
     // Check for empty content fields
     const emptyFields: string[] = [];
-    if (!this.state.content.problemText) emptyFields.push('Problem');
-    if (!this.state.content.explanationText) emptyFields.push('Explanation');
-    if (!this.state.content.correctFeedback) emptyFields.push('Correct Feedback');
-    if (!this.state.content.incorrectFeedback) emptyFields.push('Incorrect Feedback');
-    
+    if (!this.state.content.problemText) emptyFields.push("Problem");
+    if (!this.state.content.explanationText) emptyFields.push("Explanation");
+    if (!this.state.content.correctFeedback)
+      emptyFields.push("Correct Feedback");
+    if (!this.state.content.incorrectFeedback)
+      emptyFields.push("Incorrect Feedback");
+
     if (emptyFields.length > 0) {
-      warnings.push({ 
-        type: 'info', 
-        message: `${emptyFields.length} empty text field${emptyFields.length > 1 ? 's' : ''}: ${emptyFields.join(', ')}` 
+      warnings.push({
+        type: "info",
+        message: `${emptyFields.length} empty text field${emptyFields.length > 1 ? "s" : ""}: ${emptyFields.join(", ")}`,
       });
     }
 
     // Validation is only invalid if there are error-level warnings
-    const isValid = !warnings.some(w => w.type === 'error');
+    const isValid = !warnings.some((w) => w.type === "error");
 
     return { isValid, warnings };
   }
@@ -485,4 +493,3 @@ export class MirrorPuzzle {
     return this.state;
   }
 }
-

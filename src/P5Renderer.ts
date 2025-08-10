@@ -441,27 +441,8 @@ export class P5Renderer {
     const mouseX = this.p.mouseX;
     const mouseY = this.p.mouseY;
     
-    // Check for clicks on virtual objects (ONLY in edit mode)
     if (mode === "edit") {
-      const virtualData = this.puzzle.getVirtualObjects();
-      for (const vObj of virtualData.virtualObjects) {
-        if (vObj.sourceType === "triangle") {
-          const canvasPos = {
-            x: vObj.position.x + this.offset,
-            y: vObj.position.y + this.offset
-          };
-          
-          if (this.p.dist(mouseX, mouseY, canvasPos.x, canvasPos.y) < 15) {
-            // Toggle ray path for this virtual object
-            this.puzzle.toggleVirtualObjectRayPath(vObj.id);
-            return;
-          }
-        }
-      }
-    }
-    
-    if (mode === "edit") {
-      // Check if clicking on an object
+      // FIRST: Check real objects (they have priority for dragging)
       const objects = this.puzzle.getObjects();
       const trianglePos = this.roomToCanvas(objects.triangle.x, objects.triangle.y);
       const viewerPos = this.roomToCanvas(objects.viewer.x, objects.viewer.y);
@@ -488,6 +469,23 @@ export class P5Renderer {
         };
         this.hoveredVirtualTriangle = null; // Clear hover state when dragging
         return;
+      }
+      
+      // SECOND: Check for clicks on virtual objects (only after real objects, excluding depth-0)
+      const virtualData = this.puzzle.getVirtualObjects();
+      for (const vObj of virtualData.virtualObjects) {
+        if (vObj.sourceType === "triangle" && vObj.depth > 0) {
+          const canvasPos = {
+            x: vObj.position.x + this.offset,
+            y: vObj.position.y + this.offset
+          };
+          
+          if (this.p.dist(mouseX, mouseY, canvasPos.x, canvasPos.y) < 15) {
+            // Toggle ray path for this virtual object
+            this.puzzle.toggleVirtualObjectRayPath(vObj.id);
+            return;
+          }
+        }
       }
       
       // Check touch areas
@@ -616,9 +614,9 @@ export class P5Renderer {
     // Reset hover state
     this.hoveredVirtualTriangle = null;
     
-    // Check each virtual triangle for hover
+    // Check each virtual triangle for hover (excluding depth-0 which is the real object)
     virtualData.virtualObjects.forEach((vObj) => {
-      if (vObj.sourceType === "triangle") {
+      if (vObj.sourceType === "triangle" && vObj.depth > 0) {
         // Convert virtual object position to canvas coordinates
         const canvasPos = {
           x: vObj.position.x + this.offset,
