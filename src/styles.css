@@ -220,25 +220,55 @@ body {
   text-align: center;
 }
 
-.configuration-warning {
+.configuration-warnings {
   margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.warning-box {
   padding: 0.75rem;
-  background: #fef3c7;
-  border: 1px solid #fbbf24;
   border-radius: 0.375rem;
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
 }
 
+.warning-box.error {
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+}
+
+.warning-box.warning {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+}
+
+.warning-box.info {
+  background: #dbeafe;
+  border: 1px solid #3b82f6;
+}
+
 .warning-icon {
   flex-shrink: 0;
 }
 
-#warning-message {
-  color: #92400e;
+.warning-message {
   font-size: 0.875rem;
   line-height: 1.25rem;
+}
+
+.warning-box.error .warning-message {
+  color: #991b1b;
+}
+
+.warning-box.warning .warning-message {
+  color: #92400e;
+}
+
+.warning-box.info .warning-message {
+  color: #1e40af;
 }
 
 /* Play Mode Controls */

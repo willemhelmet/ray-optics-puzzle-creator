@@ -74,18 +74,22 @@ function initializeUI() {
   
   problemText?.addEventListener("input", () => {
     puzzle.setProblemText(problemText.value);
+    updateConfigurationWarning();
   });
   
   explanationText?.addEventListener("input", () => {
     puzzle.setExplanationText(explanationText.value);
+    updateConfigurationWarning();
   });
   
   correctFeedback?.addEventListener("input", () => {
     puzzle.setCorrectFeedback(correctFeedback.value);
+    updateConfigurationWarning();
   });
   
   incorrectFeedback?.addEventListener("input", () => {
     puzzle.setIncorrectFeedback(incorrectFeedback.value);
+    updateConfigurationWarning();
   });
 
   // Touch area button
@@ -177,19 +181,38 @@ function updateMirrorVisualization() {
 }
 
 function updateConfigurationWarning() {
-  const warningContainer = document.getElementById("configuration-warning");
-  const warningMessage = document.getElementById("warning-message");
+  const warningsContainer = document.getElementById("configuration-warnings");
   
-  if (!warningContainer || !warningMessage) return;
+  if (!warningsContainer) return;
   
   const validation = puzzle.validateConfiguration();
   
-  if (validation.message) {
-    warningMessage.textContent = validation.message;
-    warningContainer.style.display = "flex";
-  } else {
-    warningContainer.style.display = "none";
-  }
+  // Clear existing warnings
+  warningsContainer.innerHTML = "";
+  
+  // Add warning boxes for each warning
+  validation.warnings.forEach(warning => {
+    const warningBox = document.createElement("div");
+    warningBox.className = `warning-box ${warning.type}`;
+    
+    const icon = document.createElement("span");
+    icon.className = "warning-icon";
+    if (warning.type === "error") {
+      icon.textContent = "❌";
+    } else if (warning.type === "warning") {
+      icon.textContent = "⚠️";
+    } else {
+      icon.textContent = "ℹ️";
+    }
+    
+    const message = document.createElement("span");
+    message.className = "warning-message";
+    message.textContent = warning.message;
+    
+    warningBox.appendChild(icon);
+    warningBox.appendChild(message);
+    warningsContainer.appendChild(warningBox);
+  });
 }
 
 function showFeedback(result: any) {
@@ -743,6 +766,7 @@ function initializeDragAndDrop() {
       if (area) {
         puzzle.setTouchAreaCorrect(draggedTouchArea, !area.isCorrect);
         updateCanvas();
+        updateConfigurationWarning();
       }
     }
     
@@ -773,6 +797,7 @@ function initializeDragAndDrop() {
     if (touchAreaId) {
       puzzle.deleteTouchArea(touchAreaId);
       updateCanvas();
+      updateConfigurationWarning();
       e.preventDefault();
     }
   });

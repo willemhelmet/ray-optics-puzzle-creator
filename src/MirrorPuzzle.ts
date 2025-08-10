@@ -358,28 +358,55 @@ export class MirrorPuzzle {
   }
 
   // Configuration validation
-  validateConfiguration(): { isValid: boolean; message: string } {
-    const warnings: string[] = [];
+  validateConfiguration(): { 
+    isValid: boolean; 
+    warnings: Array<{ type: 'error' | 'warning' | 'info'; message: string }> 
+  } {
+    const warnings: Array<{ type: 'error' | 'warning' | 'info'; message: string }> = [];
 
+    // Check for touch areas
     if (this.state.touchAreas.length === 0) {
-      warnings.push("No touch areas defined - puzzle cannot be played");
+      warnings.push({ 
+        type: 'error', 
+        message: 'No touch areas defined - puzzle cannot be played' 
+      });
+    } else {
+      // Check for correct touch areas (only if there are touch areas)
+      const hasCorrectArea = this.state.touchAreas.some((ta) => ta.isCorrect);
+      if (!hasCorrectArea) {
+        warnings.push({ 
+          type: 'error', 
+          message: 'No correct touch areas defined - puzzle has no solution' 
+        });
+      }
     }
 
-    const hasCorrectArea = this.state.touchAreas.some((ta) => ta.isCorrect);
-    if (!hasCorrectArea && this.state.touchAreas.length > 0) {
-      warnings.push("No correct touch areas defined - puzzle has no solution");
-    }
-
+    // Check for complexity
     if (this.state.touchAreas.length >= 5) {
-      warnings.push("5+ touch areas - puzzle is getting too complex");
+      warnings.push({ 
+        type: 'warning', 
+        message: '5+ touch areas - puzzle is getting too complex' 
+      });
     }
 
-    const isValid =
-      warnings.length === 0 ||
-      (warnings.length === 1 && warnings[0].includes("getting too complex"));
-    const message = warnings.join(" • ");
+    // Check for empty content fields
+    const emptyFields: string[] = [];
+    if (!this.state.content.problemText) emptyFields.push('Problem');
+    if (!this.state.content.explanationText) emptyFields.push('Explanation');
+    if (!this.state.content.correctFeedback) emptyFields.push('Correct Feedback');
+    if (!this.state.content.incorrectFeedback) emptyFields.push('Incorrect Feedback');
+    
+    if (emptyFields.length > 0) {
+      warnings.push({ 
+        type: 'info', 
+        message: `${emptyFields.length} empty text field${emptyFields.length > 1 ? 's' : ''}: ${emptyFields.join(', ')}` 
+      });
+    }
 
-    return { isValid, message };
+    // Validation is only invalid if there are error-level warnings
+    const isValid = !warnings.some(w => w.type === 'error');
+
+    return { isValid, warnings };
   }
 
   // Utility
