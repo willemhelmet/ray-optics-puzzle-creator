@@ -1,5 +1,6 @@
 import p5 from "p5";
 import { MirrorPuzzle } from "./MirrorPuzzle";
+import { ReflectionEngine } from "./ReflectionEngine";
 import type { Point, TouchArea, VirtualObject } from "./types";
 
 export class P5Renderer {
@@ -23,9 +24,11 @@ export class P5Renderer {
   // Hover state for virtual triangles
   private hoveredVirtualTriangle: VirtualObject | null = null;
   private dashOffset = 0; // For animated dashed line
+  private reflectionEngine: ReflectionEngine;
   
   constructor(puzzle: MirrorPuzzle, containerId: string) {
     this.puzzle = puzzle;
+    this.reflectionEngine = new ReflectionEngine();
     
     // Create p5 sketch
     const sketch = (p: p5) => {
@@ -576,34 +579,90 @@ export class P5Renderer {
     }
   }
   
+  private drawArrow(from: Point, to: Point, r: number, g: number, b: number): void {
+    const p = this.p;
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const arrowSize = 8;
+    
+    p.push();
+    p.noStroke();
+    p.fill(r, g, b, 255);
+    p.translate(to.x, to.y);
+    p.rotate(angle);
+    p.triangle(0, 0, -arrowSize, -arrowSize/2, -arrowSize, arrowSize/2);
+    p.pop();
+  }
+  
   private drawRayToViewer(virtualTriangle: VirtualObject, viewerPosition: Point): void {
     const p = this.p;
     
-    // Convert positions to canvas coordinates
+    // Get the real triangle position
+    const objects = this.puzzle.getObjects();
+    const realTrianglePos = objects.triangle;
+    
+    // Calculate the actual ray path with bounces
+    const mirrors = this.puzzle.getMirrors();
+    const mirrorsArray = [mirrors.top, mirrors.right, mirrors.bottom, mirrors.left];
+    
+    // Use the reflection engine to calculate the path
+    const rayPath = this.reflectionEngine.calculateRayPath(
+      virtualTriangle,
+      realTrianglePos,
+      viewerPosition,
+      mirrorsArray
+    );
+    
+    // 1. Draw the ACTUAL bouncing ray path (from real triangle to viewer via mirrors)
+    if (rayPath.length >= 2) {
+      p.push();
+      p.stroke(255, 165, 0, 200); // Orange color for actual light path
+      p.strokeWeight(2);
+      
+      // Solid line for actual path
+      for (let i = 0; i < rayPath.length - 1; i++) {
+        const fromPoint = this.roomToCanvas(rayPath[i].x, rayPath[i].y);
+        const toPoint = this.roomToCanvas(rayPath[i + 1].x, rayPath[i + 1].y);
+        
+        p.line(fromPoint.x, fromPoint.y, toPoint.x, toPoint.y);
+        
+        // Draw a small circle at bounce points (not at start or end)
+        if (i > 0 && i < rayPath.length - 1) {
+          p.push();
+          p.noStroke();
+          p.fill(255, 165, 0, 255); // Orange dot at bounce point
+          p.circle(fromPoint.x, fromPoint.y, 8);
+          p.pop();
+        }
+      }
+      
+      // Add arrow at the viewer end to show direction
+      const lastSegmentStart = rayPath[rayPath.length - 2];
+      const lastSegmentEnd = rayPath[rayPath.length - 1];
+      const startPoint = this.roomToCanvas(lastSegmentStart.x, lastSegmentStart.y);
+      const endPoint = this.roomToCanvas(lastSegmentEnd.x, lastSegmentEnd.y);
+      this.drawArrow(startPoint, endPoint, 255, 165, 0);
+      
+      p.pop();
+    }
+    
+    // 2. Draw the PERCEIVED straight line (from virtual triangle to viewer)
     const triangleCanvasPos = {
       x: virtualTriangle.position.x + this.offset,
       y: virtualTriangle.position.y + this.offset
     };
     const viewerCanvasPos = this.roomToCanvas(viewerPosition.x, viewerPosition.y);
     
-    // Draw dashed line with animation
     p.push();
-    p.stroke(139, 92, 246, 153); // #8b5cf6 with 60% opacity
+    p.stroke(139, 92, 246, 180); // Purple for perceived path
     p.strokeWeight(2);
-    
-    // Set up dashed line
     p.drawingContext.setLineDash([5, 5]);
     p.drawingContext.lineDashOffset = -this.dashOffset;
-    
-    // Draw the ray
     p.line(
       triangleCanvasPos.x,
       triangleCanvasPos.y,
       viewerCanvasPos.x,
       viewerCanvasPos.y
     );
-    
-    // Reset dash
     p.drawingContext.setLineDash([]);
     p.pop();
   }

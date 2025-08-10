@@ -373,44 +373,225 @@ export class ReflectionEngine {
     };
   }
 
-  // Calculate ray path from virtual object to viewer
+  // Calculate ray path from real object to viewer with mirror bounces
   calculateRayPath(
     virtualObject: VirtualObject,
+    realObjectPos: Point,
     viewer: Point,
     _mirrors: boolean[],
   ): Point[] {
     const path: Point[] = [];
-
-    // Start from virtual object position
-    path.push(virtualObject.position);
-
-    // For depth 1: simple bounce off one mirror
-    if (virtualObject.depth === 1) {
-      // Find intersection point on mirror
-      const mirrorSide = virtualObject.id.split("-")[2] as
-        | "top"
-        | "right"
-        | "bottom"
-        | "left";
-      const intersection = this.getRayMirrorIntersection(
-        virtualObject.position,
+    
+    // Start from the real object position
+    path.push(realObjectPos);
+    
+    // Parse the virtual object ID to get reflection sequence
+    // ID format: "triangle-d2-top-left" means reflected top then left
+    const idParts = virtualObject.id.split("-");
+    const depth = virtualObject.depth;
+    
+    if (depth === 1) {
+      // Single reflection - find mirror intersection
+      const mirrorSide = idParts[2] as "top" | "right" | "bottom" | "left";
+      const mirrorPos = this.getMirrorPosition(mirrorSide, { x: 0, y: 0 });
+      
+      // The intersection point is where the line from virtual object to viewer crosses the mirror
+      // This ensures the angle of incidence equals angle of reflection
+      const intersection = this.calculateMirrorIntersection(
+        virtualObject.position,  // Use virtual position, not real
         viewer,
         mirrorSide,
+        mirrorPos
       );
+      
       if (intersection) {
         path.push(intersection);
       }
-    }
-    // For depth 2+: multiple bounces
-    else if (virtualObject.depth > 1) {
-      // TODO: Implement multiple bounce calculation
-      // For now, just draw direct line
+    } else if (depth === 2) {
+      // Two reflections - extract mirror sequence from ID
+      const mirrors = idParts.slice(2); // e.g., ["top", "left"]
+      
+      // The last mirror bounce must align with the virtual ray
+      // So we work backwards from the virtual object position
+      
+      // Find the last mirror in the sequence
+      const lastMirror = mirrors[mirrors.length - 1] as "top" | "right" | "bottom" | "left";
+      const lastMirrorPos = this.getMirrorPosition(lastMirror, { x: 0, y: 0 });
+      
+      // Find where the line from virtual object to viewer crosses the last mirror
+      const lastIntersection = this.calculateMirrorIntersection(
+        virtualObject.position,
+        viewer,
+        lastMirror,
+        lastMirrorPos
+      );
+      
+      if (lastIntersection) {
+        // Now find the first mirror intersection
+        const firstMirror = mirrors[0] as "top" | "right" | "bottom" | "left";
+        const firstMirrorPos = this.getMirrorPosition(firstMirror, { x: 0, y: 0 });
+        
+        // Find where ray from real object to last intersection hits first mirror
+        const firstIntersection = this.calculateMirrorIntersection(
+          realObjectPos,
+          lastIntersection,
+          firstMirror,
+          firstMirrorPos
+        );
+        
+        if (firstIntersection) {
+          path.push(firstIntersection);
+          path.push(lastIntersection);
+        }
+      }
+    } else if (depth === 3) {
+      // Three reflections - work backwards to ensure alignment
+      const mirrors = idParts.slice(2);
+      const intersections: Point[] = [];
+      
+      // Find the last mirror intersection (must align with virtual ray)
+      const lastMirror = mirrors[mirrors.length - 1] as "top" | "right" | "bottom" | "left";
+      const lastMirrorPos = this.getMirrorPosition(lastMirror, { x: 0, y: 0 });
+      
+      const lastIntersection = this.calculateMirrorIntersection(
+        virtualObject.position,
+        viewer,
+        lastMirror,
+        lastMirrorPos
+      );
+      
+      if (lastIntersection) {
+        intersections.push(lastIntersection);
+        
+        // Work backwards to find middle intersection
+        if (mirrors.length > 2) {
+          const middleMirror = mirrors[1] as "top" | "right" | "bottom" | "left";
+          const middleMirrorPos = this.getMirrorPosition(middleMirror, { x: 0, y: 0 });
+          
+          // Create intermediate virtual by reflecting real object through first mirror
+          const firstMirror = mirrors[0] as "top" | "right" | "bottom" | "left";
+          const firstMirrorPos = this.getMirrorPosition(firstMirror, { x: 0, y: 0 });
+          const intermediateVirtual = this.reflectPointAcrossMirror(
+            realObjectPos,
+            firstMirror,
+            firstMirrorPos
+          );
+          
+          // Find middle intersection
+          const middleIntersection = this.calculateMirrorIntersection(
+            intermediateVirtual,
+            lastIntersection,
+            middleMirror,
+            middleMirrorPos
+          );
+          
+          if (middleIntersection) {
+            // Find first intersection
+            const firstIntersection = this.calculateMirrorIntersection(
+              realObjectPos,
+              middleIntersection,
+              firstMirror,
+              firstMirrorPos
+            );
+            
+            if (firstIntersection) {
+              path.push(firstIntersection);
+              path.push(middleIntersection);
+              path.push(lastIntersection);
+            }
+          }
+        }
+      }
     }
 
     // End at viewer position
     path.push(viewer);
 
     return path;
+  }
+  
+  // Helper to reflect a point across a mirror (used for intermediate calculations)
+  private reflectPointAcrossMirror(
+    point: Point,
+    mirrorSide: "top" | "right" | "bottom" | "left",
+    mirrorPosition: number
+  ): Point {
+    const reflected = { ...point };
+    
+    switch (mirrorSide) {
+      case "top":
+        reflected.y = 2 * mirrorPosition - point.y;
+        break;
+      case "right":
+        reflected.x = 2 * mirrorPosition - point.x;
+        break;
+      case "bottom":
+        reflected.y = 2 * mirrorPosition - point.y;
+        break;
+      case "left":
+        reflected.x = 2 * mirrorPosition - point.x;
+        break;
+    }
+    
+    return reflected;
+  }
+  
+  // Calculate where a line segment intersects with a mirror
+  private calculateMirrorIntersection(
+    from: Point,
+    to: Point,
+    mirrorSide: "top" | "right" | "bottom" | "left",
+    mirrorPosition: number
+  ): Point | null {
+    // Line parametric equation: P = from + t * (to - from), where t ∈ [0,1]
+    
+    switch (mirrorSide) {
+      case "top": // Mirror at y = mirrorPosition
+        if (Math.abs(to.y - from.y) < 0.001) return null; // Parallel to mirror
+        const t_top = (mirrorPosition - from.y) / (to.y - from.y);
+        if (t_top >= 0 && t_top <= 1) {
+          const x = from.x + t_top * (to.x - from.x);
+          if (x >= 0 && x <= this.roomWidth) {
+            return { x, y: mirrorPosition };
+          }
+        }
+        break;
+        
+      case "right": // Mirror at x = mirrorPosition
+        if (Math.abs(to.x - from.x) < 0.001) return null;
+        const t_right = (mirrorPosition - from.x) / (to.x - from.x);
+        if (t_right >= 0 && t_right <= 1) {
+          const y = from.y + t_right * (to.y - from.y);
+          if (y >= 0 && y <= this.roomHeight) {
+            return { x: mirrorPosition, y };
+          }
+        }
+        break;
+        
+      case "bottom": // Mirror at y = mirrorPosition
+        if (Math.abs(to.y - from.y) < 0.001) return null;
+        const t_bottom = (mirrorPosition - from.y) / (to.y - from.y);
+        if (t_bottom >= 0 && t_bottom <= 1) {
+          const x = from.x + t_bottom * (to.x - from.x);
+          if (x >= 0 && x <= this.roomWidth) {
+            return { x, y: mirrorPosition };
+          }
+        }
+        break;
+        
+      case "left": // Mirror at x = mirrorPosition
+        if (Math.abs(to.x - from.x) < 0.001) return null;
+        const t_left = (mirrorPosition - from.x) / (to.x - from.x);
+        if (t_left >= 0 && t_left <= 1) {
+          const y = from.y + t_left * (to.y - from.y);
+          if (y >= 0 && y <= this.roomHeight) {
+            return { x: mirrorPosition, y };
+          }
+        }
+        break;
+    }
+    
+    return null;
   }
 
   // Find where a straight line from 'from' to 'to' intersects with a mirror
