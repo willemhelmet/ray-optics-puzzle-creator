@@ -63,37 +63,88 @@ export class ReflectionEngine {
       });
     }
 
-    // Step 2: For each virtual room, calculate object reflections
-    console.log("Virtual rooms created:", virtualRooms.length);
-    virtualRooms.forEach((room) => {
-
-      // Determine which mirror created this room based on position
-      let mirrorSide: "top" | "right" | "bottom" | "left";
-      if (room.position.y < 0) mirrorSide = "top";
-      else if (room.position.x > 0) mirrorSide = "right";
-      else if (room.position.y > 0) mirrorSide = "bottom";
-      else mirrorSide = "left";
-
-      console.log("Processing room at", room.position, "mirror side:", mirrorSide);
-      const mirrorPos = this.getMirrorPosition(mirrorSide, baseRoom.position);
-
+    // Step 2: For each mirror, calculate object reflections
+    console.log("Creating virtual objects for active mirrors");
+    
+    if (_mirrors[0]) { // top mirror
+      console.log("Top mirror active - reflecting objects");
       virtualObjects.push(
         this.reflectAcrossMirror(
           objects.triangle.position,
           "triangle",
-          mirrorSide,
-          room.depth,
-          mirrorPos,
+          "top",
+          1,
+          0, // top mirror is at y=0
         ),
         this.reflectAcrossMirror(
           objects.viewer.position,
           "viewer",
-          mirrorSide,
-          room.depth,
-          mirrorPos,
+          "top",
+          1,
+          0,
         ),
       );
-    });
+    }
+    
+    if (_mirrors[1]) { // right mirror
+      console.log("Right mirror active - reflecting objects");
+      virtualObjects.push(
+        this.reflectAcrossMirror(
+          objects.triangle.position,
+          "triangle",
+          "right",
+          1,
+          this.roomWidth, // right mirror is at x=200
+        ),
+        this.reflectAcrossMirror(
+          objects.viewer.position,
+          "viewer",
+          "right",
+          1,
+          this.roomWidth,
+        ),
+      );
+    }
+    
+    if (_mirrors[2]) { // bottom mirror
+      console.log("Bottom mirror active - reflecting objects");
+      virtualObjects.push(
+        this.reflectAcrossMirror(
+          objects.triangle.position,
+          "triangle",
+          "bottom",
+          1,
+          this.roomHeight, // bottom mirror is at y=200
+        ),
+        this.reflectAcrossMirror(
+          objects.viewer.position,
+          "viewer",
+          "bottom",
+          1,
+          this.roomHeight,
+        ),
+      );
+    }
+    
+    if (_mirrors[3]) { // left mirror
+      console.log("Left mirror active - reflecting objects");
+      virtualObjects.push(
+        this.reflectAcrossMirror(
+          objects.triangle.position,
+          "triangle",
+          "left",
+          1,
+          0, // left mirror is at x=0
+        ),
+        this.reflectAcrossMirror(
+          objects.viewer.position,
+          "viewer",
+          "left",
+          1,
+          0,
+        ),
+      );
+    }
 
     // For now, limiting to depth 1 for the skeleton
     // TODO: Implement depth 2+ reflections
@@ -126,35 +177,38 @@ export class ReflectionEngine {
     sourceType: "triangle" | "viewer",
     mirrorSide: "top" | "right" | "bottom" | "left",
     depth: number,
-    mirrorPosition?: number,
+    mirrorPosition: number,
     baseFlips?: { flippedX: boolean; flippedY: boolean },
   ): VirtualObject {
+    // The reflected position in world coordinates
     const reflected = { ...position };
     let flippedX = baseFlips?.flippedX || false;
     let flippedY = baseFlips?.flippedY || false;
 
     switch (mirrorSide) {
-      case "top": // horizontal mirror
-        const topMirrorY = mirrorPosition ?? 0;
-        reflected.y = 2 * topMirrorY - position.y;
+      case "top": // horizontal mirror at y=0
+        // Reflect across y=0: point at y becomes point at -y
+        reflected.y = -position.y;
         flippedY = !flippedY;
         break;
-      case "right": // vertical mirror
-        const rightMirrorX = mirrorPosition ?? this.roomWidth;
-        reflected.x = 2 * rightMirrorX - position.x;
+      case "right": // vertical mirror at x=200
+        // Reflect across x=200: point at x becomes 2*200 - x
+        reflected.x = 2 * this.roomWidth - position.x;
         flippedX = !flippedX;
         break;
-      case "bottom": // horizontal mirror
-        const bottomMirrorY = mirrorPosition ?? this.roomHeight;
-        reflected.y = 2 * bottomMirrorY - position.y;
+      case "bottom": // horizontal mirror at y=200
+        // Reflect across y=200: point at y becomes 2*200 - y
+        reflected.y = 2 * this.roomHeight - position.y;
         flippedY = !flippedY;
         break;
-      case "left": // vertical mirror
-        const leftMirrorX = mirrorPosition ?? 0;
-        reflected.x = 2 * leftMirrorX - position.x;
+      case "left": // vertical mirror at x=0
+        // Reflect across x=0: point at x becomes -x
+        reflected.x = -position.x;
         flippedX = !flippedX;
         break;
     }
+
+    console.log(`Reflecting ${sourceType} at (${position.x}, ${position.y}) across ${mirrorSide} mirror -> world coords (${reflected.x}, ${reflected.y})`);
 
     return {
       id: `${sourceType}-d${depth}-${mirrorSide}`,
