@@ -27,37 +27,37 @@ export class ReflectionEngine {
 
     // Create depth-1 virtual rooms for each mirror
     if (_mirrors[0]) {
-      // top
+      // top - room above flips the top/bottom mirrors
       virtualRooms.push({
         position: { x: 0, y: -this.roomHeight },
-        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: [_mirrors[2], _mirrors[1], _mirrors[0], _mirrors[3]], // flip top/bottom
         depth: 1,
         opacity: 0.7,
       });
     }
     if (_mirrors[1]) {
-      // right
+      // right - room to the right flips the left/right mirrors
       virtualRooms.push({
         position: { x: this.roomWidth, y: 0 },
-        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: [_mirrors[0], _mirrors[3], _mirrors[2], _mirrors[1]], // flip left/right
         depth: 1,
         opacity: 0.7,
       });
     }
     if (_mirrors[2]) {
-      // bottom
+      // bottom - room below flips the top/bottom mirrors
       virtualRooms.push({
         position: { x: 0, y: this.roomHeight },
-        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: [_mirrors[2], _mirrors[1], _mirrors[0], _mirrors[3]], // flip top/bottom
         depth: 1,
         opacity: 0.7,
       });
     }
     if (_mirrors[3]) {
-      // left
+      // left - room to the left flips the left/right mirrors
       virtualRooms.push({
         position: { x: -this.roomWidth, y: 0 },
-        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: [_mirrors[0], _mirrors[3], _mirrors[2], _mirrors[1]], // flip left/right
         depth: 1,
         opacity: 0.7,
       });
@@ -146,11 +146,163 @@ export class ReflectionEngine {
       );
     }
 
-    // For now, limiting to depth 1 for the skeleton
-    // TODO: Implement depth 2+ reflections
+    // Implement depth 2+ reflections
+    for (let currentDepth = 2; currentDepth <= _maxDepth; currentDepth++) {
+      const prevDepthRooms = virtualRooms.filter(r => r.depth === currentDepth - 1);
+      const prevDepthObjects = virtualObjects.filter(o => o.depth === currentDepth - 1);
+      
+      // Use a Set to track unique room positions and avoid duplicates
+      const roomPositionSet = new Set<string>();
+      virtualRooms.forEach(room => {
+        roomPositionSet.add(`${room.position.x},${room.position.y}`);
+      });
+      
+      // For each previous depth room, reflect it across each active mirror
+      prevDepthRooms.forEach(prevRoom => {
+        // Check each mirror in the base room
+        if (_mirrors[0]) { // top mirror
+          const newRoomY = -prevRoom.position.y - this.roomHeight;
+          const posKey = `${prevRoom.position.x},${newRoomY}`;
+          if (!roomPositionSet.has(posKey)) {
+            roomPositionSet.add(posKey);
+            // Flip top/bottom mirrors when reflecting across top
+            const newMirrors: [boolean, boolean, boolean, boolean] = [
+              prevRoom.mirrors[2], // top becomes bottom
+              prevRoom.mirrors[1], // right stays
+              prevRoom.mirrors[0], // bottom becomes top
+              prevRoom.mirrors[3]  // left stays
+            ];
+            virtualRooms.push({
+              position: { x: prevRoom.position.x, y: newRoomY },
+              mirrors: newMirrors,
+              depth: currentDepth,
+              opacity: 1.0 - currentDepth * 0.3,
+            });
+          }
+        }
+        
+        if (_mirrors[1]) { // right mirror
+          const newRoomX = 2 * this.roomWidth - prevRoom.position.x;
+          const posKey = `${newRoomX},${prevRoom.position.y}`;
+          if (!roomPositionSet.has(posKey)) {
+            roomPositionSet.add(posKey);
+            // Flip left/right mirrors when reflecting across right
+            const newMirrors: [boolean, boolean, boolean, boolean] = [
+              prevRoom.mirrors[0], // top stays
+              prevRoom.mirrors[3], // right becomes left
+              prevRoom.mirrors[2], // bottom stays
+              prevRoom.mirrors[1]  // left becomes right
+            ];
+            virtualRooms.push({
+              position: { x: newRoomX, y: prevRoom.position.y },
+              mirrors: newMirrors,
+              depth: currentDepth,
+              opacity: 1.0 - currentDepth * 0.3,
+            });
+          }
+        }
+        
+        if (_mirrors[2]) { // bottom mirror
+          const newRoomY = 2 * this.roomHeight - prevRoom.position.y;
+          const posKey = `${prevRoom.position.x},${newRoomY}`;
+          if (!roomPositionSet.has(posKey)) {
+            roomPositionSet.add(posKey);
+            // Flip top/bottom mirrors when reflecting across bottom
+            const newMirrors: [boolean, boolean, boolean, boolean] = [
+              prevRoom.mirrors[2], // top becomes bottom
+              prevRoom.mirrors[1], // right stays
+              prevRoom.mirrors[0], // bottom becomes top
+              prevRoom.mirrors[3]  // left stays
+            ];
+            virtualRooms.push({
+              position: { x: prevRoom.position.x, y: newRoomY },
+              mirrors: newMirrors,
+              depth: currentDepth,
+              opacity: 1.0 - currentDepth * 0.3,
+            });
+          }
+        }
+        
+        if (_mirrors[3]) { // left mirror
+          const newRoomX = -prevRoom.position.x - this.roomWidth;
+          const posKey = `${newRoomX},${prevRoom.position.y}`;
+          if (!roomPositionSet.has(posKey)) {
+            roomPositionSet.add(posKey);
+            // Flip left/right mirrors when reflecting across left
+            const newMirrors: [boolean, boolean, boolean, boolean] = [
+              prevRoom.mirrors[0], // top stays
+              prevRoom.mirrors[3], // right becomes left
+              prevRoom.mirrors[2], // bottom stays
+              prevRoom.mirrors[1]  // left becomes right
+            ];
+            virtualRooms.push({
+              position: { x: newRoomX, y: prevRoom.position.y },
+              mirrors: newMirrors,
+              depth: currentDepth,
+              opacity: 1.0 - currentDepth * 0.3,
+            });
+          }
+        }
+      });
+      
+      // For each previous depth object, reflect it across each active mirror
+      prevDepthObjects.forEach(prevObj => {
+        if (_mirrors[0]) { // top mirror
+          const reflected = this.reflectAcrossMirror(
+            prevObj.position,
+            prevObj.sourceType,
+            "top",
+            currentDepth,
+            0,
+            { flippedX: prevObj.flippedX, flippedY: prevObj.flippedY }
+          );
+          reflected.id = `${prevObj.sourceType}-d${currentDepth}-${prevObj.id.split('-').slice(2).join('-')}-top`;
+          virtualObjects.push(reflected);
+        }
+        
+        if (_mirrors[1]) { // right mirror
+          const reflected = this.reflectAcrossMirror(
+            prevObj.position,
+            prevObj.sourceType,
+            "right",
+            currentDepth,
+            this.roomWidth,
+            { flippedX: prevObj.flippedX, flippedY: prevObj.flippedY }
+          );
+          reflected.id = `${prevObj.sourceType}-d${currentDepth}-${prevObj.id.split('-').slice(2).join('-')}-right`;
+          virtualObjects.push(reflected);
+        }
+        
+        if (_mirrors[2]) { // bottom mirror
+          const reflected = this.reflectAcrossMirror(
+            prevObj.position,
+            prevObj.sourceType,
+            "bottom",
+            currentDepth,
+            this.roomHeight,
+            { flippedX: prevObj.flippedX, flippedY: prevObj.flippedY }
+          );
+          reflected.id = `${prevObj.sourceType}-d${currentDepth}-${prevObj.id.split('-').slice(2).join('-')}-bottom`;
+          virtualObjects.push(reflected);
+        }
+        
+        if (_mirrors[3]) { // left mirror  
+          const reflected = this.reflectAcrossMirror(
+            prevObj.position,
+            prevObj.sourceType,
+            "left",
+            currentDepth,
+            0,
+            { flippedX: prevObj.flippedX, flippedY: prevObj.flippedY }
+          );
+          reflected.id = `${prevObj.sourceType}-d${currentDepth}-${prevObj.id.split('-').slice(2).join('-')}-left`;
+          virtualObjects.push(reflected);
+        }
+      });
+    }
 
-    console.log("Returning virtualObjects:", virtualObjects);
-    console.log("Returning virtualRooms:", virtualRooms);
+    console.log(`Generated ${virtualObjects.length} virtual objects up to depth ${_maxDepth}`);
+    console.log(`Generated ${virtualRooms.length} virtual rooms up to depth ${_maxDepth}`);
     return { virtualObjects, virtualRooms };
   }
 
