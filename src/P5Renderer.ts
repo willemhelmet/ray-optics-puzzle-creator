@@ -20,6 +20,10 @@ export class P5Renderer {
   private mouseDownPos = { x: 0, y: 0 };
   private hasMoved = false;
   
+  // Hover state for virtual triangles
+  private hoveredVirtualTriangle: VirtualObject | null = null;
+  private dashOffset = 0; // For animated dashed line
+  
   constructor(puzzle: MirrorPuzzle, containerId: string) {
     this.puzzle = puzzle;
     
@@ -47,6 +51,13 @@ export class P5Renderer {
       
       p.mouseReleased = () => {
         this.handleMouseUp();
+      };
+      
+      p.mouseMoved = () => {
+        // Only detect hover when not dragging
+        if (this.puzzle.getMode() === "edit" && !this.isDragging) {
+          this.detectHoveredTriangle();
+        }
       };
       
       // Right-click for deleting touch areas
@@ -164,6 +175,14 @@ export class P5Renderer {
     touchAreas.forEach((area) => {
       this.drawTouchArea(area, selectedAreas.includes(area.id), mode, submissionResult);
     });
+    
+    // Draw ray from hovered virtual triangle to viewer (edit mode only)
+    if (this.hoveredVirtualTriangle && mode === "edit") {
+      this.drawRayToViewer(this.hoveredVirtualTriangle, objects.viewer);
+    }
+    
+    // Update dash offset for animation
+    this.dashOffset = (this.dashOffset + 0.5) % 10;
   }
   
   private drawTriangle(position: Point, isVirtual: boolean, opacity: number = 1) {
@@ -201,16 +220,19 @@ export class P5Renderer {
       y: vObj.position.y + this.offset
     };
     
+    // Check if this object is being hovered
+    const isHovered = this.hoveredVirtualTriangle && this.hoveredVirtualTriangle.id === vObj.id;
+    
     if (vObj.sourceType === "triangle") {
-      this.drawTriangleAtCanvasPos(canvasPos, true, vObj.opacity, vObj.flippedX, vObj.flippedY);
+      this.drawTriangleAtCanvasPos(canvasPos, true, vObj.opacity, vObj.flippedX, vObj.flippedY, isHovered);
     } else if (vObj.sourceType === "viewer") {
       this.drawViewerAtCanvasPos(canvasPos, true, vObj.opacity);
     }
   }
   
-  private drawTriangleAtCanvasPos(canvasPos: Point, isVirtual: boolean, opacity: number = 1, flippedX: boolean = false, flippedY: boolean = false) {
+  private drawTriangleAtCanvasPos(canvasPos: Point, isVirtual: boolean, opacity: number = 1, flippedX: boolean = false, flippedY: boolean = false, isHovered: boolean = false) {
     const p = this.p;
-    const size = 10;
+    const size = isHovered ? 12 : 10; // Make it slightly larger when hovered
     
     p.push();
     
@@ -224,13 +246,21 @@ export class P5Renderer {
     }
     
     if (isVirtual) {
-      p.fill(255, 107, 107, opacity * 255); // #ff6b6b with opacity
-      p.stroke(214, 48, 49, opacity * 255); // #d63031 with opacity
+      if (isHovered) {
+        // Highlight color when hovered
+        p.fill(255, 150, 150, opacity * 255); // Lighter red
+        p.stroke(139, 92, 246, opacity * 255); // Purple outline
+        p.strokeWeight(3);
+      } else {
+        p.fill(255, 107, 107, opacity * 255); // #ff6b6b with opacity
+        p.stroke(214, 48, 49, opacity * 255); // #d63031 with opacity
+        p.strokeWeight(2);
+      }
     } else {
       p.fill(255, 107, 107); // #ff6b6b
       p.stroke(214, 48, 49); // #d63031
+      p.strokeWeight(2);
     }
-    p.strokeWeight(2);
     
     // Draw triangle centered at origin (since we translated)
     p.triangle(
@@ -380,6 +410,7 @@ export class P5Renderer {
           x: mouseX - trianglePos.x,
           y: mouseY - trianglePos.y
         };
+        this.hoveredVirtualTriangle = null; // Clear hover state when dragging
         return;
       }
       
@@ -391,6 +422,7 @@ export class P5Renderer {
           x: mouseX - viewerPos.x,
           y: mouseY - viewerPos.y
         };
+        this.hoveredVirtualTriangle = null; // Clear hover state when dragging
         return;
       }
       
@@ -508,5 +540,71 @@ export class P5Renderer {
   public updateConfigurationWarning() {
     // This will be called from main.ts
     // Configuration warnings are handled in the HTML UI
+  }
+  
+  private detectHoveredTriangle(): void {
+    const mouseX = this.p.mouseX;
+    const mouseY = this.p.mouseY;
+    const virtualData = this.puzzle.getVirtualObjects();
+    
+    // Reset hover state
+    const previousHover = this.hoveredVirtualTriangle;
+    this.hoveredVirtualTriangle = null;
+    
+    // Check each virtual triangle for hover
+    virtualData.virtualObjects.forEach((vObj) => {
+      if (vObj.sourceType === "triangle") {
+        // Convert virtual object position to canvas coordinates
+        const canvasPos = {
+          x: vObj.position.x + this.offset,
+          y: vObj.position.y + this.offset
+        };
+        
+        // Check if mouse is within 15 pixels of triangle center
+        const distance = this.p.dist(mouseX, mouseY, canvasPos.x, canvasPos.y);
+        if (distance < 15) {
+          this.hoveredVirtualTriangle = vObj;
+          if (!previousHover) {
+            console.log("Hovering over virtual triangle:", vObj.id, "at", canvasPos);
+          }
+        }
+      }
+    });
+    
+    if (previousHover && !this.hoveredVirtualTriangle) {
+      console.log("Stopped hovering");
+    }
+  }
+  
+  private drawRayToViewer(virtualTriangle: VirtualObject, viewerPosition: Point): void {
+    const p = this.p;
+    
+    // Convert positions to canvas coordinates
+    const triangleCanvasPos = {
+      x: virtualTriangle.position.x + this.offset,
+      y: virtualTriangle.position.y + this.offset
+    };
+    const viewerCanvasPos = this.roomToCanvas(viewerPosition.x, viewerPosition.y);
+    
+    // Draw dashed line with animation
+    p.push();
+    p.stroke(139, 92, 246, 153); // #8b5cf6 with 60% opacity
+    p.strokeWeight(2);
+    
+    // Set up dashed line
+    p.drawingContext.setLineDash([5, 5]);
+    p.drawingContext.lineDashOffset = -this.dashOffset;
+    
+    // Draw the ray
+    p.line(
+      triangleCanvasPos.x,
+      triangleCanvasPos.y,
+      viewerCanvasPos.x,
+      viewerCanvasPos.y
+    );
+    
+    // Reset dash
+    p.drawingContext.setLineDash([]);
+    p.pop();
   }
 }
