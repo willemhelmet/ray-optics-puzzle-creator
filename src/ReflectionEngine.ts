@@ -427,20 +427,15 @@ export class ReflectionEngine {
       mirrors,
     );
     
-    console.log('Segment from', currentStart, 'to', currentEnd);
-    console.log('Found', crossings.length, 'crossings:', crossings);
-
     if (crossings.length === 0) {
       // Base case: no mirrors between these points
       // We've traced back to a segment that goes directly to the real object
-      console.log('No more crossings - reached real object segment');
       return;
     }
 
     // Get the mirror crossing FURTHEST from currentStart (closest to currentEnd)
     // This is the last crossing in our sorted array (sorted by t parameter)
     const lastCrossing = crossings[crossings.length - 1];
-    console.log('Last crossing (closest to end) at:', lastCrossing.point, 'on', lastCrossing.mirror);
 
     // Add this crossing point to our bounces
     bouncesFound.push(lastCrossing.point);

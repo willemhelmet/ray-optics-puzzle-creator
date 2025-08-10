@@ -51,9 +51,7 @@ export class P5Renderer {
         
         // Add native mousedown listener for more reliable right-click detection
         this.canvas.elt.addEventListener('mousedown', (e: MouseEvent) => {
-          console.log('Native mousedown event, button:', e.button);
           if (e.button === 2) { // Right button
-            console.log('Native right-click detected!');
             e.preventDefault();
             e.stopPropagation();
             this.handleRightClick();
@@ -67,10 +65,7 @@ export class P5Renderer {
       
       p.mousePressed = (_event?: object) => {
         // Check for right-click
-        // p5.js uses 'CENTER' for right-click on some systems, and mouseButton can be 'right' (string) or RIGHT constant
-        console.log('Mouse button pressed:', p.mouseButton, typeof p.mouseButton);
         if (p.mouseButton === 'right' || p.mouseButton === p.RIGHT || p.mouseButton === 2) {
-          console.log('Right-click detected!');
           this.handleRightClick();
           return false; // Prevent default
         }
@@ -533,19 +528,14 @@ export class P5Renderer {
   }
   
   private handleRightClick() {
-    console.log('handleRightClick called, mode:', this.puzzle.getMode());
     if (this.puzzle.getMode() !== "edit") return;
     
     const mouseX = this.p.mouseX;
     const mouseY = this.p.mouseY;
     const touchAreas = this.puzzle.getAllTouchAreas();
-    console.log('Mouse position:', mouseX, mouseY, 'Touch areas:', touchAreas.length);
     
     for (const area of touchAreas) {
-      const isInArea = this.isPointInTouchArea(mouseX, mouseY, area);
-      console.log('Checking area', area.id, 'at', area.position, 'isInArea:', isInArea);
-      if (isInArea) {
-        console.log('Deleting touch area:', area.id);
+      if (this.isPointInTouchArea(mouseX, mouseY, area)) {
         this.puzzle.deleteTouchArea(area.id);
         this.onTouchAreaChange?.();
         return;
@@ -580,7 +570,6 @@ export class P5Renderer {
     const virtualData = this.puzzle.getVirtualObjects();
     
     // Reset hover state
-    const previousHover = this.hoveredVirtualTriangle;
     this.hoveredVirtualTriangle = null;
     
     // Check each virtual triangle for hover
@@ -596,16 +585,10 @@ export class P5Renderer {
         const distance = this.p.dist(mouseX, mouseY, canvasPos.x, canvasPos.y);
         if (distance < 15) {
           this.hoveredVirtualTriangle = vObj;
-          if (!previousHover) {
-            console.log("Hovering over virtual triangle:", vObj.id, "at", canvasPos);
-          }
         }
       }
     });
     
-    if (previousHover && !this.hoveredVirtualTriangle) {
-      console.log("Stopped hovering");
-    }
   }
   
   private drawArrow(from: Point, to: Point, r: number, g: number, b: number): void {
