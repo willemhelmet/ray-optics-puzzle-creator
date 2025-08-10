@@ -1,5 +1,6 @@
 import "./styles.css";
 import { MirrorPuzzle } from "./MirrorPuzzle";
+import type { Point } from "./types";
 
 // Initialize the puzzle
 const puzzle = new MirrorPuzzle();
@@ -200,9 +201,206 @@ function showFeedback(result: any) {
 }
 
 function updateCanvas() {
-  // TODO: Implement canvas rendering
-  // This will render the room, mirrors, objects, virtual objects, etc.
-  console.log("Canvas update needed");
+  const canvas = document.getElementById("canvas") as SVGElement;
+  if (!canvas) return;
+
+  // Clear existing content (except for persistent groups)
+  const roomGroup = document.getElementById("room-group") || createGroup(canvas, "room-group");
+  const objectsGroup = document.getElementById("objects-group") || createGroup(canvas, "objects-group");
+  const virtualObjectsGroup = document.getElementById("virtual-objects") || canvas.querySelector("#virtual-objects");
+  const virtualRoomsGroup = document.getElementById("virtual-rooms") || canvas.querySelector("#virtual-rooms");
+  const touchAreasGroup = document.getElementById("touch-areas-group") || createGroup(canvas, "touch-areas-group");
+  const rayPathsGroup = document.getElementById("ray-paths-group") || createGroup(canvas, "ray-paths-group");
+
+  // Clear content
+  roomGroup.innerHTML = "";
+  objectsGroup.innerHTML = "";
+  if (virtualObjectsGroup) virtualObjectsGroup.innerHTML = "";
+  if (virtualRoomsGroup) virtualRoomsGroup.innerHTML = "";
+  touchAreasGroup.innerHTML = "";
+  rayPathsGroup.innerHTML = "";
+
+  // Room is 200x200, centered in 800x800 canvas
+  const roomSize = 200;
+  const canvasSize = 800;
+  const offset = (canvasSize - roomSize) / 2; // 300px offset to center the room
+  
+  // Helper to convert room coordinates to canvas coordinates
+  const roomToCanvas = (x: number, y: number) => {
+    return {
+      x: x + offset,
+      y: y + offset
+    };
+  };
+
+  // Draw background
+  const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  bg.setAttribute("x", "0");
+  bg.setAttribute("y", "0");
+  bg.setAttribute("width", "800");
+  bg.setAttribute("height", "800");
+  bg.setAttribute("fill", "#e0e0e0");
+  roomGroup.appendChild(bg);
+
+  // Draw main room (200x200 centered)
+  const roomRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  roomRect.setAttribute("x", String(offset));
+  roomRect.setAttribute("y", String(offset));
+  roomRect.setAttribute("width", String(roomSize));
+  roomRect.setAttribute("height", String(roomSize));
+  roomRect.setAttribute("fill", "#ffffff");
+  roomRect.setAttribute("stroke", "#333");
+  roomRect.setAttribute("stroke-width", "2");
+  roomGroup.appendChild(roomRect);
+
+  // Draw mirrors on room edges
+  const mirrors = puzzle.getMirrors();
+  const mirrorStyle = "stroke: #4a90e2; stroke-width: 3; stroke-linecap: round;";
+  
+  if (mirrors.top) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", String(offset));
+    line.setAttribute("y1", String(offset));
+    line.setAttribute("x2", String(offset + roomSize));
+    line.setAttribute("y2", String(offset));
+    line.setAttribute("style", mirrorStyle);
+    roomGroup.appendChild(line);
+  }
+  
+  if (mirrors.right) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", String(offset + roomSize));
+    line.setAttribute("y1", String(offset));
+    line.setAttribute("x2", String(offset + roomSize));
+    line.setAttribute("y2", String(offset + roomSize));
+    line.setAttribute("style", mirrorStyle);
+    roomGroup.appendChild(line);
+  }
+  
+  if (mirrors.bottom) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", String(offset));
+    line.setAttribute("y1", String(offset + roomSize));
+    line.setAttribute("x2", String(offset + roomSize));
+    line.setAttribute("y2", String(offset + roomSize));
+    line.setAttribute("style", mirrorStyle);
+    roomGroup.appendChild(line);
+  }
+  
+  if (mirrors.left) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", String(offset));
+    line.setAttribute("y1", String(offset));
+    line.setAttribute("x2", String(offset));
+    line.setAttribute("y2", String(offset + roomSize));
+    line.setAttribute("style", mirrorStyle);
+    roomGroup.appendChild(line);
+  }
+
+  // Get object positions
+  const objects = puzzle.getObjects();
+  
+  // Draw triangle object (positions are in room coordinates 0-200)
+  const trianglePos = roomToCanvas(objects.triangle.x, objects.triangle.y);
+  const triangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+  const size = 10;
+  const points = `${trianglePos.x},${trianglePos.y - size} ${trianglePos.x - size},${trianglePos.y + size} ${trianglePos.x + size},${trianglePos.y + size}`;
+  triangle.setAttribute("points", points);
+  triangle.setAttribute("fill", "#ff6b6b");
+  triangle.setAttribute("stroke", "#d63031");
+  triangle.setAttribute("stroke-width", "2");
+  triangle.setAttribute("class", "draggable-object");
+  triangle.setAttribute("data-object", "triangle");
+  triangle.setAttribute("cursor", puzzle.getMode() === "edit" ? "move" : "default");
+  objectsGroup.appendChild(triangle);
+
+  // Draw viewer (eye symbol)
+  const viewerPos = roomToCanvas(objects.viewer.x, objects.viewer.y);
+  
+  // Eye outline (circle)
+  const eyeOutline = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+  eyeOutline.setAttribute("cx", String(viewerPos.x));
+  eyeOutline.setAttribute("cy", String(viewerPos.y));
+  eyeOutline.setAttribute("rx", "12");
+  eyeOutline.setAttribute("ry", "8");
+  eyeOutline.setAttribute("fill", "#333");
+  eyeOutline.setAttribute("stroke", "#000");
+  eyeOutline.setAttribute("stroke-width", "2");
+  eyeOutline.setAttribute("class", "draggable-object");
+  eyeOutline.setAttribute("data-object", "viewer");
+  eyeOutline.setAttribute("cursor", puzzle.getMode() === "edit" ? "move" : "default");
+  objectsGroup.appendChild(eyeOutline);
+  
+  // Eye pupil
+  const pupil = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  pupil.setAttribute("cx", String(viewerPos.x));
+  pupil.setAttribute("cy", String(viewerPos.y));
+  pupil.setAttribute("r", "4");
+  pupil.setAttribute("fill", "#fff");
+  pupil.setAttribute("pointer-events", "none");
+  objectsGroup.appendChild(pupil);
+
+  // Draw virtual rooms (reflected room boundaries)
+  const virtualData = puzzle.getVirtualObjects();
+  virtualData.virtualRooms.forEach((vRoom) => {
+    if (vRoom.depth > 0) {
+      const vRoomPos = roomToCanvas(vRoom.position.x, vRoom.position.y);
+      const vRoomRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      vRoomRect.setAttribute("x", String(vRoomPos.x));
+      vRoomRect.setAttribute("y", String(vRoomPos.y));
+      vRoomRect.setAttribute("width", String(roomSize));
+      vRoomRect.setAttribute("height", String(roomSize));
+      vRoomRect.setAttribute("fill", "none");
+      vRoomRect.setAttribute("stroke", "#999");
+      vRoomRect.setAttribute("stroke-width", "1");
+      vRoomRect.setAttribute("stroke-dasharray", "3,3");
+      vRoomRect.setAttribute("opacity", String(vRoom.opacity));
+      if (virtualRoomsGroup) virtualRoomsGroup.appendChild(vRoomRect);
+    }
+  });
+
+  // Draw virtual objects (reflections)
+  virtualData.virtualObjects.forEach((vObj) => {
+    const vPos = roomToCanvas(vObj.position.x, vObj.position.y);
+    
+    if (vObj.type === "triangle") {
+      const vTriangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      const vPoints = `${vPos.x},${vPos.y - size} ${vPos.x - size},${vPos.y + size} ${vPos.x + size},${vPos.y + size}`;
+      vTriangle.setAttribute("points", vPoints);
+      vTriangle.setAttribute("fill", "#ff6b6b");
+      vTriangle.setAttribute("stroke", "#d63031");
+      vTriangle.setAttribute("stroke-width", "1");
+      vTriangle.setAttribute("opacity", String(vObj.opacity));
+      vTriangle.setAttribute("stroke-dasharray", "2,2");
+      if (virtualObjectsGroup) virtualObjectsGroup.appendChild(vTriangle);
+    }
+  });
+
+  // Draw touch areas in edit mode
+  if (puzzle.getMode() === "edit") {
+    const touchAreas = puzzle.getAllTouchAreas();
+    touchAreas.forEach((area) => {
+      const areaPos = roomToCanvas(area.position.x, area.position.y);
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", String(areaPos.x));
+      circle.setAttribute("cy", String(areaPos.y));
+      circle.setAttribute("r", String(area.radius));
+      circle.setAttribute("fill", area.isCorrect ? "rgba(76, 175, 80, 0.3)" : "rgba(244, 67, 54, 0.3)");
+      circle.setAttribute("stroke", area.isCorrect ? "#4caf50" : "#f44336");
+      circle.setAttribute("stroke-width", "2");
+      circle.setAttribute("stroke-dasharray", "5,5");
+      circle.setAttribute("class", "touch-area");
+      circle.setAttribute("data-id", area.id);
+      touchAreasGroup.appendChild(circle);
+    });
+  }
+}
+
+function createGroup(parent: SVGElement, id: string): SVGGElement {
+  const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  group.setAttribute("id", id);
+  parent.appendChild(group);
+  return group;
 }
 
 function updateUI() {
@@ -248,9 +446,125 @@ function downloadJSON(json: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// Drag and drop functionality
+function initializeDragAndDrop() {
+  const canvas = document.getElementById("canvas") as SVGElement;
+  if (!canvas) return;
+
+  let isDragging = false;
+  let draggedObject: "triangle" | "viewer" | null = null;
+  let dragOffset = { x: 0, y: 0 };
+
+  // Constants for room and canvas dimensions
+  const roomSize = 200;
+  const canvasSize = 800;
+  const canvasOffset = (canvasSize - roomSize) / 2; // 300px
+  
+  // Object sizes (half-widths for boundary calculation)
+  const triangleHalfSize = 10;
+  const viewerHalfWidth = 12;
+  const viewerHalfHeight = 8;
+
+  // Convert canvas coordinates to room coordinates
+  function canvasToRoom(canvasX: number, canvasY: number): Point {
+    return {
+      x: canvasX - canvasOffset,
+      y: canvasY - canvasOffset
+    };
+  }
+
+  // Get mouse position relative to canvas
+  function getMousePos(e: MouseEvent): Point {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  }
+
+  // Constrain position within room bounds with object size consideration
+  function constrainPosition(x: number, y: number, objectType: "triangle" | "viewer"): Point {
+    let minX: number, maxX: number, minY: number, maxY: number;
+    
+    if (objectType === "triangle") {
+      minX = triangleHalfSize;
+      maxX = roomSize - triangleHalfSize;
+      minY = triangleHalfSize;
+      maxY = roomSize - triangleHalfSize;
+    } else {
+      minX = viewerHalfWidth;
+      maxX = roomSize - viewerHalfWidth;
+      minY = viewerHalfHeight;
+      maxY = roomSize - viewerHalfHeight;
+    }
+    
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y))
+    };
+  }
+
+  // Mouse down handler
+  canvas.addEventListener("mousedown", (e: MouseEvent) => {
+    if (puzzle.getMode() !== "edit") return;
+
+    const target = e.target as SVGElement;
+    const objectType = target.getAttribute("data-object");
+    
+    if (objectType === "triangle" || objectType === "viewer") {
+      isDragging = true;
+      draggedObject = objectType as "triangle" | "viewer";
+      
+      const mousePos = getMousePos(e);
+      const objects = puzzle.getObjects();
+      const objPos = draggedObject === "triangle" ? objects.triangle : objects.viewer;
+      
+      // Calculate offset between mouse and object center
+      dragOffset = {
+        x: mousePos.x - (objPos.x + canvasOffset),
+        y: mousePos.y - (objPos.y + canvasOffset)
+      };
+      
+      e.preventDefault();
+    }
+  });
+
+  // Mouse move handler
+  canvas.addEventListener("mousemove", (e: MouseEvent) => {
+    if (!isDragging || !draggedObject) return;
+    
+    const mousePos = getMousePos(e);
+    const roomPos = canvasToRoom(mousePos.x - dragOffset.x, mousePos.y - dragOffset.y);
+    const constrainedPos = constrainPosition(roomPos.x, roomPos.y, draggedObject);
+    
+    puzzle.moveObject(draggedObject, constrainedPos);
+    updateCanvas();
+    
+    e.preventDefault();
+  });
+
+  // Mouse up handler
+  canvas.addEventListener("mouseup", () => {
+    isDragging = false;
+    draggedObject = null;
+  });
+
+  // Mouse leave handler (stop dragging if mouse leaves canvas)
+  canvas.addEventListener("mouseleave", () => {
+    isDragging = false;
+    draggedObject = null;
+  });
+}
+
 // Initialize when DOM is ready
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initializeUI);
+  document.addEventListener("DOMContentLoaded", () => {
+    initializeUI();
+    initializeDragAndDrop();
+    updateUI();
+  });
 } else {
   initializeUI();
+  initializeDragAndDrop();
+  updateUI();
 }

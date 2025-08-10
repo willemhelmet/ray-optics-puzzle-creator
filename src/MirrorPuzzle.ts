@@ -53,6 +53,14 @@ export class MirrorPuzzle {
     return this.state.mode;
   }
 
+  // Get current object positions
+  getObjects(): { triangle: Point; viewer: Point } {
+    return {
+      triangle: { ...this.state.objects.triangle.position },
+      viewer: { ...this.state.objects.viewer.position }
+    };
+  }
+
   // Object management (edit mode only)
   moveObject(type: "triangle" | "viewer", position: Point): void {
     if (this.state.mode !== "edit") return;
@@ -189,7 +197,7 @@ export class MirrorPuzzle {
   }
 
   // Virtual object queries (read-only, both modes)
-  getVirtualObjects(): VirtualObject[] {
+  getVirtualObjects(): { virtualObjects: VirtualObject[]; virtualRooms: VirtualRoom[] } {
     const result = this.reflectionEngine.calculateVirtualObjects(
       this.state.objects,
       this.state.room.mirrors,
@@ -210,7 +218,7 @@ export class MirrorPuzzle {
       }
     }
     
-    return result.virtualObjects;
+    return result;
   }
 
   getVirtualRooms(): VirtualRoom[] {
