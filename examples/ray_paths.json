@@ -1,0 +1,66 @@
+{
+  "mode": "edit",
+  "room": {
+    "width": 200,
+    "height": 200,
+    "mirrors": [
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "objects": {
+    "triangle": {
+      "position": {
+        "x": 100,
+        "y": 75
+      }
+    },
+    "viewer": {
+      "position": {
+        "x": 100,
+        "y": 175
+      }
+    }
+  },
+  "touchAreas": [
+    {
+      "id": "touch-1754868385769-n3p4c7qad",
+      "position": {
+        "x": 602.5,
+        "y": 379.5
+      },
+      "isCorrect": true,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754868388011-yrudbxttu",
+      "position": {
+        "x": 601.5,
+        "y": 622
+      },
+      "isCorrect": false,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754868392120-7la6m5vzq",
+      "position": {
+        "x": 401,
+        "y": 625
+      },
+      "isCorrect": true,
+      "radius": 30
+    }
+  ],
+  "content": {
+    "problemText": "Which of these virtual images is this ray NOT describing?",
+    "explanationText": "The fact that there were more than one reflection is the key to understanding this puzzle.",
+    "correctFeedback": "Nice job!",
+    "incorrectFeedback": "Not quite, try counting the number of reflections and try again."
+  },
+  "selectedVirtualObjectsForRay": [
+    "triangle-d2-right-bottom"
+  ],
+  "maxReflectionDepth": 3
+}

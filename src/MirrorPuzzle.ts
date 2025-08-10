@@ -361,12 +361,17 @@ export class MirrorPuzzle {
 
   // Export/Import
   exportJSON(): string {
-    return JSON.stringify(this.state, null, 2);
+    // Convert Set to array for JSON serialization
+    const stateForExport = {
+      ...this.state,
+      selectedVirtualObjectsForRay: Array.from(this.state.selectedVirtualObjectsForRay)
+    };
+    return JSON.stringify(stateForExport, null, 2);
   }
 
   importJSON(json: string): void {
     try {
-      const importedState = JSON.parse(json) as PuzzleState;
+      const importedState = JSON.parse(json) as any;
       // Validate the imported state has required fields
       if (
         importedState.mode &&
@@ -375,7 +380,23 @@ export class MirrorPuzzle {
         importedState.touchAreas &&
         importedState.content
       ) {
-        this.state = importedState;
+        // Convert array back to Set for selectedVirtualObjectsForRay
+        // Handle both old format (field missing or was selectedVirtualObjectForRay) and new format
+        let rayPathSet = new Set<string>();
+        if (importedState.selectedVirtualObjectsForRay) {
+          // New format - could be array or already a Set
+          if (Array.isArray(importedState.selectedVirtualObjectsForRay)) {
+            rayPathSet = new Set(importedState.selectedVirtualObjectsForRay);
+          }
+        } else if (importedState.selectedVirtualObjectForRay) {
+          // Old format - single string
+          rayPathSet = new Set([importedState.selectedVirtualObjectForRay]);
+        }
+        
+        this.state = {
+          ...importedState,
+          selectedVirtualObjectsForRay: rayPathSet
+        };
         this.selectedTouchAreas.clear();
       }
     } catch (error) {

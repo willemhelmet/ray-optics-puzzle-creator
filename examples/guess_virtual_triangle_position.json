@@ -1,0 +1,73 @@
+{
+  "mode": "edit",
+  "room": {
+    "width": 200,
+    "height": 200,
+    "mirrors": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "objects": {
+    "triangle": {
+      "position": {
+        "x": 33,
+        "y": 167.5
+      }
+    },
+    "viewer": {
+      "position": {
+        "x": 81.5,
+        "y": 62.5
+      }
+    }
+  },
+  "touchAreas": [
+    {
+      "id": "touch-1754868583143-s7crmx3uy",
+      "position": {
+        "x": 265.5,
+        "y": 534
+      },
+      "isCorrect": true,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754868589938-5ahdhu1ye",
+      "position": {
+        "x": 264,
+        "y": 334.5
+      },
+      "isCorrect": false,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754868595969-sfdycvpi2",
+      "position": {
+        "x": 618,
+        "y": 365
+      },
+      "isCorrect": false,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754868614681-xz5xw06p7",
+      "position": {
+        "x": 334,
+        "y": 466.5
+      },
+      "isCorrect": false,
+      "radius": 30
+    }
+  ],
+  "content": {
+    "problemText": "Which one of these squares will contain a virtual image of a triangle if all of the walls are mirrors?",
+    "explanationText": "",
+    "correctFeedback": "Good job tracking where the virtual images are!",
+    "incorrectFeedback": "Try thinking about where a 1st order reflection will be, and then try reflecting that one."
+  },
+  "selectedVirtualObjectsForRay": [],
+  "maxReflectionDepth": 3
+}
