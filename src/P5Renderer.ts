@@ -64,13 +64,17 @@ export class P5Renderer {
       };
       
       p.mousePressed = (_event?: object) => {
-        // Check for right-click
-        if (p.mouseButton === 'right' || p.mouseButton === p.RIGHT || p.mouseButton === 2) {
-          this.handleRightClick();
-          return false; // Prevent default
+        // Only handle mouse events if the mouse is over the canvas
+        if (p.mouseX >= 0 && p.mouseX <= this.canvasSize && 
+            p.mouseY >= 0 && p.mouseY <= this.canvasSize) {
+          // Check for right-click
+          if (p.mouseButton === 'right' || p.mouseButton === p.RIGHT || p.mouseButton === 2) {
+            this.handleRightClick();
+            return false; // Prevent default for right-click
+          }
+          this.handleMouseDown();
+          // Don't prevent default for left-click, so text inputs can still get focus
         }
-        this.handleMouseDown();
-        return false; // Prevent default for all mouse buttons
       };
       
       p.mouseDragged = () => {
