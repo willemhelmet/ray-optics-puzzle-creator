@@ -227,7 +227,7 @@ export class P5Renderer {
     const isHovered = this.hoveredVirtualTriangle && this.hoveredVirtualTriangle.id === vObj.id;
     
     if (vObj.sourceType === "triangle") {
-      this.drawTriangleAtCanvasPos(canvasPos, true, vObj.opacity, vObj.flippedX, vObj.flippedY, isHovered);
+      this.drawTriangleAtCanvasPos(canvasPos, true, vObj.opacity, vObj.flippedX, vObj.flippedY, isHovered || false);
     } else if (vObj.sourceType === "viewer") {
       this.drawViewerAtCanvasPos(canvasPos, true, vObj.opacity);
     }

@@ -15,12 +15,6 @@ export class ReflectionEngine {
     const virtualRooms: VirtualRoom[] = [];
 
     // Step 1: Create first-order virtual rooms
-    const baseRoom: VirtualRoom = {
-      position: { x: 0, y: 0 },
-      mirrors: _mirrors as [boolean, boolean, boolean, boolean],
-      depth: 0,
-      opacity: 1.0,
-    };
 
     // Create depth-1 virtual rooms for each mirror
     if (_mirrors[0]) {
@@ -312,47 +306,6 @@ export class ReflectionEngine {
     return { virtualObjects, virtualRooms };
   }
 
-  // Get mirror index from side name
-  private getMirrorIndex(side: "top" | "right" | "bottom" | "left"): number {
-    switch (side) {
-      case "top":
-        return 0;
-      case "right":
-        return 1;
-      case "bottom":
-        return 2;
-      case "left":
-        return 3;
-    }
-  }
-
-  // Get the start point of a mirror line segment
-  private getMirrorStart(side: "top" | "right" | "bottom" | "left"): Point {
-    switch (side) {
-      case "top":
-        return { x: 0, y: 0 };
-      case "right":
-        return { x: this.roomWidth, y: 0 };
-      case "bottom":
-        return { x: 0, y: this.roomHeight };
-      case "left":
-        return { x: 0, y: 0 };
-    }
-  }
-
-  // Get the end point of a mirror line segment
-  private getMirrorEnd(side: "top" | "right" | "bottom" | "left"): Point {
-    switch (side) {
-      case "top":
-        return { x: this.roomWidth, y: 0 };
-      case "right":
-        return { x: this.roomWidth, y: this.roomHeight };
-      case "bottom":
-        return { x: this.roomWidth, y: this.roomHeight };
-      case "left":
-        return { x: 0, y: this.roomHeight };
-    }
-  }
 
   // Helper to get mirror position in world coordinates
   getMirrorPosition(
@@ -377,7 +330,7 @@ export class ReflectionEngine {
     sourceType: "triangle" | "viewer",
     mirrorSide: "top" | "right" | "bottom" | "left",
     depth: number,
-    mirrorPosition: number,
+    _mirrorPosition: number,
     baseFlips?: { flippedX: boolean; flippedY: boolean },
   ): VirtualObject {
     // The reflected position in world coordinates
@@ -639,160 +592,4 @@ export class ReflectionEngine {
     return null;
   }
 
-  // Find where a line segment intersects with a mirror, returning the intersection point and parameter t
-  private findLineSegmentMirrorIntersection(
-    from: Point,
-    to: Point,
-    mirrorSide: "top" | "right" | "bottom" | "left",
-  ): { point: Point; mirror: typeof mirrorSide; t: number } | null {
-    // Line parametric equation: P = from + t * (to - from)
-    // t ∈ [0,1] represents points on the segment from 'from' to 'to'
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-
-    let t: number = -1;
-    let intersectionPoint: Point | null = null;
-
-    switch (mirrorSide) {
-      case "top": // Mirror at y = 0
-        if (Math.abs(dy) < 0.001) return null; // Parallel
-        t = (0 - from.y) / dy;
-        if (t >= 0 && t <= 1) {
-          // Include endpoints for now
-          const x = from.x + t * dx;
-          if (x >= 0 && x <= this.roomWidth) {
-            intersectionPoint = { x, y: 0 };
-          }
-        }
-        break;
-
-      case "right": // Mirror at x = roomWidth
-        if (Math.abs(dx) < 0.001) return null;
-        t = (this.roomWidth - from.x) / dx;
-        if (t >= 0 && t <= 1) {
-          const y = from.y + t * dy;
-          if (y >= 0 && y <= this.roomHeight) {
-            intersectionPoint = { x: this.roomWidth, y };
-          }
-        }
-        break;
-
-      case "bottom": // Mirror at y = roomHeight
-        if (Math.abs(dy) < 0.001) return null;
-        t = (this.roomHeight - from.y) / dy;
-        if (t >= 0 && t <= 1) {
-          const x = from.x + t * dx;
-          if (x >= 0 && x <= this.roomWidth) {
-            intersectionPoint = { x, y: this.roomHeight };
-          }
-        }
-        break;
-
-      case "left": // Mirror at x = 0
-        if (Math.abs(dx) < 0.001) return null;
-        t = (0 - from.x) / dx;
-        if (t >= 0 && t <= 1) {
-          const y = from.y + t * dy;
-          if (y >= 0 && y <= this.roomHeight) {
-            intersectionPoint = { x: 0, y };
-          }
-        }
-        break;
-    }
-
-    if (intersectionPoint && t > 0.001 && t < 0.999) {
-      // Exclude endpoints with small tolerance
-      return { point: intersectionPoint, mirror: mirrorSide, t };
-    }
-
-    return null;
-  }
-
-  // Check if a point is within the room bounds
-  private isPointInRoom(p: Point): boolean {
-    return (
-      p.x >= 0 && p.x <= this.roomWidth && p.y >= 0 && p.y <= this.roomHeight
-    );
-  }
-
-  // Find where a ray hits a specific mirror
-  private findRayMirrorIntersection(
-    from: Point,
-    to: Point,
-    mirrorSide: "top" | "right" | "bottom" | "left",
-  ): Point | null {
-    // Line equation: P = from + t * (to - from)
-    // We solve for t when the line crosses the mirror
-    // t can be any value to handle rays from virtual objects outside the room
-
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-
-    switch (mirrorSide) {
-      case "top": // Mirror at y = 0
-        if (Math.abs(dy) < 0.001) return null; // Parallel
-        const t_top = (0 - from.y) / dy;
-        // We want the intersection regardless of direction for virtual->viewer lines
-        const x_top = from.x + t_top * dx;
-        if (x_top >= 0 && x_top <= this.roomWidth) {
-          return { x: x_top, y: 0 };
-        }
-        break;
-
-      case "right": // Mirror at x = roomWidth
-        if (Math.abs(dx) < 0.001) return null;
-        const t_right = (this.roomWidth - from.x) / dx;
-        const y_right = from.y + t_right * dy;
-        if (y_right >= 0 && y_right <= this.roomHeight) {
-          return { x: this.roomWidth, y: y_right };
-        }
-        break;
-
-      case "bottom": // Mirror at y = roomHeight
-        if (Math.abs(dy) < 0.001) return null;
-        const t_bottom = (this.roomHeight - from.y) / dy;
-        const x_bottom = from.x + t_bottom * dx;
-        if (x_bottom >= 0 && x_bottom <= this.roomWidth) {
-          return { x: x_bottom, y: this.roomHeight };
-        }
-        break;
-
-      case "left": // Mirror at x = 0
-        if (Math.abs(dx) < 0.001) return null;
-        const t_left = (0 - from.x) / dx;
-        const y_left = from.y + t_left * dy;
-        if (y_left >= 0 && y_left <= this.roomHeight) {
-          return { x: 0, y: y_left };
-        }
-        break;
-    }
-
-    return null;
-  }
-
-  // Helper to reflect a point across a mirror (used for intermediate calculations)
-  private reflectPointAcrossMirror(
-    point: Point,
-    mirrorSide: "top" | "right" | "bottom" | "left",
-    mirrorPosition: number,
-  ): Point {
-    const reflected = { ...point };
-
-    switch (mirrorSide) {
-      case "top":
-        reflected.y = 2 * mirrorPosition - point.y;
-        break;
-      case "right":
-        reflected.x = 2 * mirrorPosition - point.x;
-        break;
-      case "bottom":
-        reflected.y = 2 * mirrorPosition - point.y;
-        break;
-      case "left":
-        reflected.x = 2 * mirrorPosition - point.x;
-        break;
-    }
-
-    return reflected;
-  }
 }

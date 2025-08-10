@@ -224,8 +224,14 @@ export class MirrorPuzzle {
         (vo) => vo.id === this.state.selectedVirtualObjectForRay,
       );
       if (selectedObject) {
+        // Get the real object position based on the source type
+        const realObjectPos = selectedObject.sourceType === 'triangle' 
+          ? this.state.objects.triangle.position
+          : this.state.objects.viewer.position;
+        
         selectedObject.rayPath = this.reflectionEngine.calculateRayPath(
           selectedObject,
+          realObjectPos,
           this.state.objects.viewer.position,
           this.state.room.mirrors,
         );
