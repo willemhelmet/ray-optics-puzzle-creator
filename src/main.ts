@@ -116,7 +116,8 @@ function initializeUI() {
     const explanationContainer = document.getElementById("explanation-container");
     const explanationDisplay = document.getElementById("explanation-display");
     if (explanationContainer && explanationDisplay) {
-      explanationDisplay.textContent = puzzle.getContent().explanationText;
+      const explanationText = puzzle.getContent().explanationText;
+      explanationDisplay.textContent = explanationText || "Light bounces off mirrors to create virtual images. The position of these reflections follows the laws of physics - the angle of incidence equals the angle of reflection.";
       explanationContainer.style.display = "block";
     }
   });
@@ -143,10 +144,11 @@ function updateModeUI() {
     if (editControls) editControls.style.display = "none";
     if (playControls) playControls.style.display = "block";
     
-    // Update problem display
+    // Update problem display with default if empty
     const problemDisplay = document.getElementById("problem-display");
     if (problemDisplay) {
-      problemDisplay.textContent = puzzle.getContent().problemText;
+      const problemText = puzzle.getContent().problemText;
+      problemDisplay.textContent = problemText || "Click where you see reflections of the triangle";
     }
   }
   
