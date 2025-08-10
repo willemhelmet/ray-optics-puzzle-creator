@@ -201,7 +201,7 @@ function showFeedback(result: any) {
 }
 
 function updateCanvas() {
-  const canvas = document.getElementById("canvas") as SVGElement;
+  const canvas = document.getElementById("canvas") as unknown as SVGElement;
   if (!canvas) return;
 
   // Clear existing content (except for persistent groups)
@@ -363,7 +363,7 @@ function updateCanvas() {
   virtualData.virtualObjects.forEach((vObj) => {
     const vPos = roomToCanvas(vObj.position.x, vObj.position.y);
     
-    if (vObj.type === "triangle") {
+    if (vObj.sourceType === "triangle") {
       const vTriangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
       const vPoints = `${vPos.x},${vPos.y - size} ${vPos.x - size},${vPos.y + size} ${vPos.x + size},${vPos.y + size}`;
       vTriangle.setAttribute("points", vPoints);
@@ -448,7 +448,7 @@ function downloadJSON(json: string, filename: string) {
 
 // Drag and drop functionality
 function initializeDragAndDrop() {
-  const canvas = document.getElementById("canvas") as SVGElement;
+  const canvas = document.getElementById("canvas") as unknown as SVGElement;
   if (!canvas) return;
 
   let isDragging = false;
