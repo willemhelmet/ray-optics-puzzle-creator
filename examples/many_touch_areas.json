@@ -1,0 +1,82 @@
+{
+  "mode": "edit",
+  "room": {
+    "width": 200,
+    "height": 200,
+    "mirrors": [
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "objects": {
+    "triangle": {
+      "position": {
+        "x": 100,
+        "y": 75
+      }
+    },
+    "viewer": {
+      "position": {
+        "x": 100,
+        "y": 175
+      }
+    }
+  },
+  "touchAreas": [
+    {
+      "id": "touch-1754869417851-fdp8g4hm2",
+      "position": {
+        "x": 401,
+        "y": 226.5
+      },
+      "isCorrect": false,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754869418171-oroovz9l3",
+      "position": {
+        "x": 599.5,
+        "y": 378.5
+      },
+      "isCorrect": true,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754869418349-72p6pmafg",
+      "position": {
+        "x": 400,
+        "y": 624.5
+      },
+      "isCorrect": false,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754869418572-fzfaxmgru",
+      "position": {
+        "x": 200,
+        "y": 378.5
+      },
+      "isCorrect": false,
+      "radius": 30
+    },
+    {
+      "id": "touch-1754869432074-cucblw3qg",
+      "position": {
+        "x": 399,
+        "y": 383.5
+      },
+      "isCorrect": false,
+      "radius": 30
+    }
+  ],
+  "content": {
+    "problemText": "If the right wall were a mirror, where would we see an virtual image?",
+    "explanationText": "The virtual image would be on the right side of the room.",
+    "correctFeedback": "",
+    "incorrectFeedback": ""
+  },
+  "selectedVirtualObjectsForRay": [],
+  "maxReflectionDepth": 3
+}
