@@ -1,6 +1,5 @@
-import {
+import type {
   Point,
-  Objects,
   TouchArea,
   Content,
   ValidationResult,

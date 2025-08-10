@@ -1,4 +1,4 @@
-import { Point, Objects, VirtualObject, VirtualRoom } from "./types";
+import type { Point, Objects, VirtualObject, VirtualRoom } from "./types";
 
 export class ReflectionEngine {
   private roomWidth: number = 200;
@@ -7,8 +7,8 @@ export class ReflectionEngine {
   // Calculate all virtual positions up to maxDepth
   calculateVirtualObjects(
     objects: Objects,
-    mirrors: boolean[], // [top, right, bottom, left]
-    maxDepth: number
+    _mirrors: boolean[], // [top, right, bottom, left]
+    _maxDepth: number
   ): { virtualObjects: VirtualObject[]; virtualRooms: VirtualRoom[] } {
     const virtualObjects: VirtualObject[] = [];
     const virtualRooms: VirtualRoom[] = [];
@@ -16,44 +16,44 @@ export class ReflectionEngine {
     // Step 1: Create first-order virtual rooms
     const baseRoom: VirtualRoom = {
       position: { x: 0, y: 0 },
-      mirrors: mirrors as [boolean, boolean, boolean, boolean],
+      mirrors: _mirrors as [boolean, boolean, boolean, boolean],
       depth: 0,
       opacity: 1.0,
     };
 
     // Create depth-1 virtual rooms for each mirror
-    if (mirrors[0]) {
+    if (_mirrors[0]) {
       // top
       virtualRooms.push({
         position: { x: 0, y: -this.roomHeight },
-        mirrors: mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
         depth: 1,
         opacity: 0.7,
       });
     }
-    if (mirrors[1]) {
+    if (_mirrors[1]) {
       // right
       virtualRooms.push({
         position: { x: this.roomWidth, y: 0 },
-        mirrors: mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
         depth: 1,
         opacity: 0.7,
       });
     }
-    if (mirrors[2]) {
+    if (_mirrors[2]) {
       // bottom
       virtualRooms.push({
         position: { x: 0, y: this.roomHeight },
-        mirrors: mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
         depth: 1,
         opacity: 0.7,
       });
     }
-    if (mirrors[3]) {
+    if (_mirrors[3]) {
       // left
       virtualRooms.push({
         position: { x: -this.roomWidth, y: 0 },
-        mirrors: mirrors as [boolean, boolean, boolean, boolean],
+        mirrors: _mirrors as [boolean, boolean, boolean, boolean],
         depth: 1,
         opacity: 0.7,
       });
@@ -164,7 +164,7 @@ export class ReflectionEngine {
   calculateRayPath(
     virtualObject: VirtualObject,
     viewer: Point,
-    mirrors: boolean[]
+    _mirrors: boolean[]
   ): Point[] {
     const path: Point[] = [];
 
